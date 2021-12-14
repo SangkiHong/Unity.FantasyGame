@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using MoreMountains.Feedbacks;
 using BehaviorDesigner.Runtime.Tasks.Movement;
+using DG.Tweening;
 
 namespace Sangki.Scripts.Enemy
 {
@@ -78,7 +79,11 @@ namespace Sangki.Scripts.Enemy
         [SerializeField]
         private AttackColliderSwitch attackColliderSwitch;
         [SerializeField]
-        RuntimeAnimatorController archerAC, wizardAC;
+        private RuntimeAnimatorController archerAC, wizardAC;
+        [SerializeField]
+        private LineRenderer shotLineRenderer;
+        [SerializeField]
+        private Transform arrowLineStartPos;
         #endregion
 
         #region EQUIPMENT
@@ -103,7 +108,7 @@ namespace Sangki.Scripts.Enemy
         private Collider thisCollider;
         private WaitForSeconds ws_State;
         private NavMeshHit navHit;
-        private Vector3 randomDirection;
+        private Vector3 randomDirection, arrowLineEndPos;
 
         private readonly string m_Tag_Damage = "Damage"; 
         private readonly string m_String_EnemyHP = "EnemyHP"; 
@@ -119,9 +124,9 @@ namespace Sangki.Scripts.Enemy
                     m_AnimPara_ShotArrow;
 
         private float stateTime, blinkTimer, attackTimer, seekIdleTimer;
-        private float defaultSpeed, defaultStopDist, attackDist;
-        private int currentHealth;
-        private bool isDead, isDamaged, isHealthBarAttached, isNavMeshLink;
+        private float defaultSpeed, defaultStopDist, attackDist, targetWeight, layerChangeSpeed;
+        private int currentHealth, targetLayer;
+        private bool isDead, isDamaged, isHealthBarAttached, isNavMeshLink, isOnShotLine, isChangeLayerWeight;
         #endregion
         #endregion
 
@@ -174,7 +179,7 @@ namespace Sangki.Scripts.Enemy
             isDamaged = false;
             isHealthBarAttached = false;
             blinkTimer = 0;
-            attackTimer = 0;
+            attackTimer = attackCooldown * 0.5f;
             seekIdleTimer = 0; 
             enemyState = EnemyState.Seek;
             anim.SetFloat(m_AnimPara_MoveBlend, 0);
@@ -245,6 +250,7 @@ namespace Sangki.Scripts.Enemy
 
                             if (!anim.GetBool(m_AnimPara_isAttack))
                             {
+                                if (navAgent.isStopped) navAgent.isStopped = false;
                                 if (!navAgent.pathPending)
                                 {
                                     if (!isDamaged)
@@ -252,7 +258,7 @@ namespace Sangki.Scripts.Enemy
                                         navAgent.SetDestination(targetObject.transform.position);
                                     }
                                 }
-                                if (navAgent.remainingDistance != 0 && navAgent.remainingDistance <= attackDist && navAgent.velocity == Vector3.zero)
+                                if (navAgent.remainingDistance != 0 && navAgent.remainingDistance <= attackDist)
                                 {
                                     enemyState = EnemyState.Attack;
                                     anim.SetBool(m_AnimPara_isFight, true);
@@ -268,6 +274,8 @@ namespace Sangki.Scripts.Enemy
                         if (!anim.GetBool(m_AnimPara_isAttack))
                         {
                             if (!CheckPlayerAlive()) break;
+
+                            if (!navAgent.isStopped) navAgent.isStopped = true;
 
                             // TARGET 과 거리 측정 후 STATE 재설정(공격 중이 아닐 때)
                             float targetDist = Vector3.Distance(thisTransform.position, targetObject.transform.position);
@@ -336,6 +344,14 @@ namespace Sangki.Scripts.Enemy
             if (enemyState == EnemyState.Attack)
             {
                 FollowTarget(); // FIGHT MODE 시 타겟 바라보기
+
+                if (isOnShotLine)
+                {
+                    shotLineRenderer.SetPosition(0, arrowLineStartPos.position);
+                    arrowLineEndPos = targetObject.transform.position;
+                    arrowLineEndPos.y = arrowLineStartPos.position.y;
+                    shotLineRenderer.SetPosition(1, arrowLineEndPos);
+                }
             }
             else
             {
@@ -376,6 +392,20 @@ namespace Sangki.Scripts.Enemy
                 isNavMeshLink = false;
                 navAgent.velocity = Vector3.zero;
                 navAgent.speed = defaultSpeed;
+            }
+
+            if (isChangeLayerWeight)
+            {
+                float cw = anim.GetLayerWeight(targetLayer);
+                if (cw != targetWeight)
+                {
+                    var currentWeight = Mathf.Lerp(cw, targetWeight, Time.deltaTime * layerChangeSpeed);
+                    anim.SetLayerWeight(1, currentWeight);
+                }
+                else
+                {
+                    isChangeLayerWeight = false;
+                }
             }
         }
 
@@ -445,8 +475,31 @@ namespace Sangki.Scripts.Enemy
             // SHOT ARROW
             if (type == 1)
             {
-                anim.SetLayerWeight(1, 1);
+                anim.SetBool(m_AnimPara_isAttack, true);
+                ChangeLayerWeight(1, 1, 5f);
                 anim.SetTrigger(m_AnimPara_Aimming);
+                shotLineRenderer.gameObject.SetActive(true);
+                isOnShotLine = true;
+                Sequence shotArrow = DOTween.Sequence();
+                shotArrow
+                    .AppendInterval(2f)
+                    .AppendCallback(() => 
+                    {
+                        if (!isDamaged)
+                        {
+                            shotLineRenderer.SetPosition(1, arrowLineStartPos.position);
+                            shotLineRenderer.gameObject.SetActive(false);
+                            isOnShotLine = false;
+                            anim.SetTrigger(m_AnimPara_ShotArrow);
+
+                        }
+                    })
+                    .AppendInterval(0.4f)
+                    .AppendCallback(()=>
+                    {
+                        ChangeLayerWeight(1, 0, 2f);
+                        anim.SetBool(m_AnimPara_isAttack, false);
+                    });
             }
             // SPELL
             if (type == 2)
@@ -483,6 +536,14 @@ namespace Sangki.Scripts.Enemy
         {
             Vector3 dir = targetObject.transform.position - thisTransform.position;
             thisTransform.rotation = Quaternion.Lerp(thisTransform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * lookSpeed);
+        }
+
+        private void ChangeLayerWeight(int layerNum, float to, float speed)
+        {
+            targetLayer = layerNum;
+            targetWeight = to;
+            layerChangeSpeed = speed;
+            isChangeLayerWeight = true;
         }
 
         private bool CheckPlayerAlive()
