@@ -88,7 +88,7 @@ namespace Sangki.Scripts.Enemy
 
         #region EQUIPMENT
         [SerializeField]
-        private GameObject[] equipments; 
+        private GameObject[] equipments;
         #endregion
 
         #region FEEDBACK
@@ -112,6 +112,7 @@ namespace Sangki.Scripts.Enemy
 
         private readonly string m_Tag_Damage = "Damage"; 
         private readonly string m_String_EnemyHP = "EnemyHP"; 
+        private readonly string m_String_Arrow = "Arrow"; 
 
         private int m_AnimPara_isMove,
                     m_AnimPara_MoveBlend,
@@ -148,6 +149,9 @@ namespace Sangki.Scripts.Enemy
             {
                 equipments[1].SetActive(true);
                 anim.runtimeAnimatorController = archerAC;
+
+                m_AnimPara_Aimming = anim.GetParameter(8).nameHash;
+                m_AnimPara_ShotArrow = anim.GetParameter(9).nameHash;
             }
             else if (enemyClass == EnemyClass.Wizard)
             {
@@ -162,8 +166,6 @@ namespace Sangki.Scripts.Enemy
             m_AnimPara_isAttack = anim.GetParameter(5).nameHash;
             m_AnimPara_Dead = anim.GetParameter(6).nameHash;
             m_AnimPara_Jump = anim.GetParameter(7).nameHash;
-            m_AnimPara_Aimming = anim.GetParameter(8).nameHash;
-            m_AnimPara_ShotArrow = anim.GetParameter(9).nameHash;
 
         }
 
@@ -179,7 +181,7 @@ namespace Sangki.Scripts.Enemy
             isDamaged = false;
             isHealthBarAttached = false;
             blinkTimer = 0;
-            attackTimer = attackCooldown * 0.5f;
+            attackTimer = attackCooldown * 0.7f;
             seekIdleTimer = 0; 
             enemyState = EnemyState.Seek;
             anim.SetFloat(m_AnimPara_MoveBlend, 0);
@@ -491,6 +493,9 @@ namespace Sangki.Scripts.Enemy
                             shotLineRenderer.gameObject.SetActive(false);
                             isOnShotLine = false;
                             anim.SetTrigger(m_AnimPara_ShotArrow);
+
+                            // Arrow
+                            PoolManager.instance.GetObject(m_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.rotation);
 
                         }
                     })

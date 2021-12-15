@@ -11,7 +11,7 @@ public class PoolObject : MonoBehaviour {
 	public virtual void OnAwake() { }
 
 	protected void Done(float time) {
-		DOVirtual.DelayedCall(time, () => { Done(); });
+		DOVirtual.DelayedCall(time, () => { if (gameObject.activeInHierarchy) Done(); });
 	}
 
 	protected void Done(bool isUI = false) {

@@ -1,21 +1,20 @@
 
 using UnityEngine;
 using System.Collections;
-using Sangki.Scripts.Player;
+using System.Collections.Generic;
 
 namespace Sangki.Scripts
 {
     public class AttackColliderSwitch : MonoBehaviour
     {
         [SerializeField]
-        private GameObject armParent;
+        private List<BoxCollider> weaponColliders;
         [SerializeField] private float timing_Init;
         [SerializeField] private float timing_duration;
 
         [HideInInspector]
         public bool isCancel;
 
-        private BoxCollider weaponCollider;
         private ParticleSystem attackTrail;
         private WaitForSeconds ws_Init, ws;
 
@@ -27,15 +26,22 @@ namespace Sangki.Scripts
 
         private void Start()
         {
-            weaponCollider = armParent.GetComponentInChildren<BoxCollider>();
-            if (weaponCollider) weaponCollider.enabled = false;
-            attackTrail = armParent.GetComponentInChildren<ParticleSystem>();
-            attackTrail?.gameObject.SetActive(false);
+
+            if (weaponColliders.Count != 0)
+            {
+                for (int i = 0; i < weaponColliders.Count; i++) 
+                {
+                    weaponColliders[i].enabled = false; 
+                    if (!attackTrail) attackTrail = weaponColliders[i].GetComponentInChildren<ParticleSystem>(); 
+                    attackTrail?.gameObject.SetActive(false);
+                }
+            }
+            
         }
 
         public void DoAttack()
         {
-            if (weaponCollider)
+            if (weaponColliders.Count != 0)
             {
                 isCancel = false;
                 StartCoroutine(StateLoop());
@@ -44,12 +50,13 @@ namespace Sangki.Scripts
 
         IEnumerator StateLoop()
         {
+            Debug.Log("StartLoop");
             yield return ws_Init;
             attackTrail?.gameObject.SetActive(true);
-            if (!isCancel) weaponCollider.enabled = true;
+            if (!isCancel) for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = true;
             yield return ws;
             attackTrail?.gameObject.SetActive(false);
-            weaponCollider.enabled = false;
+            for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = false;
         }
     }
 }
