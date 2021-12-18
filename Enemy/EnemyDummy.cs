@@ -283,7 +283,7 @@ public class EnemyDummy : MonoBehaviour
                         isHealthBarAttached = true;
 
                         enemyHealthBar = UIPoolManager.instance.GetObject(m_String_EnemyHP, transform.position).GetComponent<EnemyHealthBar>();
-                        enemyHealthBar.Assign(transform);
+                        enemyHealthBar.Assign(transform, healthPoint);
                     }
                 }
                 // DEAD
@@ -302,6 +302,8 @@ public class EnemyDummy : MonoBehaviour
                         enemyHealthBar = null;
                     }
                 }
+
+                if (isHealthBarAttached) enemyHealthBar.UpdateState(currentHealth);
             }
         }
     }

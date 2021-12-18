@@ -1,9 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EnemyHealthBar : PoolObject
 {
+    [SerializeField]
+    private Slider slider;
+
     private Transform thisTransform, targetTransform;
     private float offsetY;
     private bool isAssign;
@@ -21,12 +25,18 @@ public class EnemyHealthBar : PoolObject
         }
     }
 
-    public void Assign(Transform target) 
+    public void Assign(Transform target, int maxValue) 
     {
         isAssign = true;
         targetTransform = target;
 
         offsetY = targetTransform.GetComponent<Collider>().bounds.max.y - targetTransform.position.y;
+        slider.maxValue = maxValue;
+    }
+
+    public void UpdateState(int currentPoint)
+    {
+        slider.value = currentPoint;
     }
 
     public void Unssaign()

@@ -277,12 +277,6 @@ namespace Sangki.Scripts.Player
                             {
                                 isCharged = false;
                                 anim.SetTrigger(_Anim_Para_ChargingEnd);
-
-                                // Feedback
-                                feedback_Attack?.PlayFeedbacks();
-
-                                // Collider On
-                                attackColliderSwitch.DoAttack();
                             }
                             // Normal Attack
                             else
@@ -317,6 +311,15 @@ namespace Sangki.Scripts.Player
                     rotarionLerp = 0;
                 }
             }
+        }
+
+        public void MeleeAttack()
+        {
+            // Feedback
+            feedback_Attack?.PlayFeedbacks();
+
+            // Collider On
+            attackColliderSwitch.DoAttack();
         }
 
         private void Rotate()

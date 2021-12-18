@@ -9,18 +9,16 @@ namespace Sangki.Scripts
     {
         [SerializeField]
         private List<BoxCollider> weaponColliders;
-        [SerializeField] private float timing_Init;
         [SerializeField] private float timing_duration;
 
         [HideInInspector]
         public bool isCancel;
 
         private ParticleSystem attackTrail;
-        private WaitForSeconds ws_Init, ws;
+        private WaitForSeconds ws;
 
         private void Awake()
         {
-            ws_Init = new WaitForSeconds(timing_Init);
             ws = new WaitForSeconds(timing_duration);
         }
 
@@ -50,8 +48,6 @@ namespace Sangki.Scripts
 
         IEnumerator StateLoop()
         {
-            Debug.Log("StartLoop");
-            yield return ws_Init;
             attackTrail?.gameObject.SetActive(true);
             if (!isCancel) for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = true;
             yield return ws;

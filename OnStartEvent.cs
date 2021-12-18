@@ -34,10 +34,6 @@ public class OnStartEvent : StateMachineBehaviour
                 break;
             case EventType.PlayerAttack:
                 animator.SetBool(hash_IsAttack, true);
-                PlayerController.Instance.feedback_Attack.PlayFeedbacks();
-
-                // Collider On
-                PlayerController.Instance.attackColliderSwitch.DoAttack();
                 break;
         }
     }

@@ -116,13 +116,15 @@ namespace Sangki.Scripts.Enemy
 
         private int m_AnimPara_isMove,
                     m_AnimPara_MoveBlend,
+                    m_AnimPara_MeleeSpeed,
                     m_AnimPara_Attack,
                     m_AnimPara_isFight,
                     m_AnimPara_isAttack,
                     m_AnimPara_Dead,
                     m_AnimPara_Jump,
                     m_AnimPara_Aimming,
-                    m_AnimPara_ShotArrow;
+                    m_AnimPara_ShotArrow,
+                    m_AnimPara_Spell;
 
         private float stateTime, blinkTimer, attackTimer, seekIdleTimer;
         private float defaultSpeed, defaultStopDist, attackDist, targetWeight, layerChangeSpeed;
@@ -131,6 +133,7 @@ namespace Sangki.Scripts.Enemy
         #endregion
         #endregion
 
+        #region AWAKE, ONENABLE, LOOP, UPDATE
         private void Awake()
         {
             thisTransform = this.transform;
@@ -150,13 +153,14 @@ namespace Sangki.Scripts.Enemy
                 equipments[1].SetActive(true);
                 anim.runtimeAnimatorController = archerAC;
 
-                m_AnimPara_Aimming = anim.GetParameter(8).nameHash;
-                m_AnimPara_ShotArrow = anim.GetParameter(9).nameHash;
+                m_AnimPara_Aimming = anim.GetParameter(9).nameHash;
+                m_AnimPara_ShotArrow = anim.GetParameter(10).nameHash;
             }
             else if (enemyClass == EnemyClass.Wizard)
             {
                 equipments[2].SetActive(true);
                 anim.runtimeAnimatorController = wizardAC;
+                m_AnimPara_Spell = anim.GetParameter(9).nameHash;
             }
 
             m_AnimPara_MoveBlend = anim.GetParameter(0).nameHash;
@@ -166,6 +170,8 @@ namespace Sangki.Scripts.Enemy
             m_AnimPara_isAttack = anim.GetParameter(5).nameHash;
             m_AnimPara_Dead = anim.GetParameter(6).nameHash;
             m_AnimPara_Jump = anim.GetParameter(7).nameHash;
+            m_AnimPara_MeleeSpeed = anim.GetParameter(8).nameHash;
+
 
         }
 
@@ -200,14 +206,17 @@ namespace Sangki.Scripts.Enemy
             if (enemyClass == EnemyClass.Normal)
             {
                 attackDist = navAgent.stoppingDistance + 0.1f;
+                anim.SetFloat(m_AnimPara_MeleeSpeed, 1.1f);
             }
             else if (enemyClass == EnemyClass.Archer)
             {
                 attackDist = 12;
+                anim.SetFloat(m_AnimPara_MeleeSpeed, 1f);
             }
             else if (enemyClass == EnemyClass.Wizard)
             {
                 attackDist = 10;
+                anim.SetFloat(m_AnimPara_MeleeSpeed, 0.9f);
             }
 
             StartCoroutine(StateCoroutine());
@@ -310,7 +319,7 @@ namespace Sangki.Scripts.Enemy
                                         {
                                             Attacks(1);
                                         }
-                                        else if (enemyClass == EnemyClass.Archer)
+                                        else if (enemyClass == EnemyClass.Wizard)
                                         {
                                             Attacks(2);
                                         }
@@ -410,6 +419,7 @@ namespace Sangki.Scripts.Enemy
                 }
             }
         }
+        #endregion
 
         private void OnTriggerEnter(Collider other)
         {
@@ -417,7 +427,14 @@ namespace Sangki.Scripts.Enemy
             {
                 if (!isDead && !isDamaged)
                 {
-                    currentHealth -= Player.PlayerController.Instance.attackPower;
+                    if (other.gameObject.layer == 9) // Player Attack
+                    {
+                        currentHealth -= Player.PlayerController.Instance.attackPower;
+                    }
+                    else if (other.gameObject.layer == 10) // Object Damage
+                    {
+                        currentHealth -= 1;
+                    }
                     navAgent.isStopped = true;
                     isDamaged = true;
                     attackColliderSwitch.isCancel = true;
@@ -429,7 +446,8 @@ namespace Sangki.Scripts.Enemy
 
                         if (enemyState != EnemyState.Attack)
                         {
-                            anim.SetBool(m_AnimPara_isMove, true);
+                            anim.SetBool(m_AnimPara_isFight, true);
+                            //anim.SetBool(m_AnimPara_isMove, true);
                             targetObject = Player.PlayerController.Instance.gameObject;
                             navAgent.speed = defaultSpeed;
                             navAgent.stoppingDistance = defaultStopDist;
@@ -441,7 +459,7 @@ namespace Sangki.Scripts.Enemy
                             isHealthBarAttached = true;
 
                             enemyHealthBar = UIPoolManager.instance.GetObject(m_String_EnemyHP, thisTransform.position).GetComponent<EnemyHealthBar>();
-                            enemyHealthBar.Assign(thisTransform);
+                            enemyHealthBar.Assign(thisTransform, healthPoint);
                         }
                     }
                     else
@@ -449,7 +467,7 @@ namespace Sangki.Scripts.Enemy
                         isDead = true;
                         enemyState = EnemyState.Dead;
                         anim.SetTrigger(m_AnimPara_Dead);
-                        feedback_Dead.PlayFeedbacks();
+                        feedback_Dead?.PlayFeedbacks();
                         thisCollider.enabled = false;
                         if (enemyHealthBar)
                         {
@@ -458,21 +476,19 @@ namespace Sangki.Scripts.Enemy
                             isHealthBarAttached = false;
                         }
                     }
+
+                    if (isHealthBarAttached) enemyHealthBar.UpdateState(currentHealth);
                 }
             }
         }
 
-        // ATTACK
+        #region ATTACK
         private void Attacks(int type = 0)
         {
             // MELLEE
             if (type == 0)
             {
                 anim.SetTrigger(m_AnimPara_Attack);
-                // Feedback
-                feedback_Attack?.PlayFeedbacks();
-                // Collider On
-                attackColliderSwitch?.DoAttack();
             }
             // SHOT ARROW
             if (type == 1)
@@ -508,10 +524,24 @@ namespace Sangki.Scripts.Enemy
             }
             // SPELL
             if (type == 2)
-            { 
-                
+            {
+                anim.SetTrigger(m_AnimPara_Spell);
             }
         }
+
+        public void MeleeAttack()
+        {
+            // Feedback
+            feedback_Attack?.PlayFeedbacks();
+            // Collider On
+            attackColliderSwitch?.DoAttack();
+        }
+
+        public void SpellAttack()
+        { 
+            
+        }
+#endregion
 
         // TARGET SEARCH RADER
         private void Rader()
