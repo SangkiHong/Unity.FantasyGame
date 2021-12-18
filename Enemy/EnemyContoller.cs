@@ -113,6 +113,7 @@ namespace Sangki.Scripts.Enemy
         private readonly string m_Tag_Damage = "Damage"; 
         private readonly string m_String_EnemyHP = "EnemyHP"; 
         private readonly string m_String_Arrow = "Arrow"; 
+        private readonly string m_String_Fireball = "Fireball"; 
 
         private int m_AnimPara_isMove,
                     m_AnimPara_MoveBlend,
@@ -538,8 +539,9 @@ namespace Sangki.Scripts.Enemy
         }
 
         public void SpellAttack()
-        { 
-            
+        {
+            // Fireball
+            PoolManager.instance.GetObject(m_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.rotation);
         }
 #endregion
 

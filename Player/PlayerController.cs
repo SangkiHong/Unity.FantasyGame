@@ -89,7 +89,8 @@ namespace Sangki.Scripts.Player
                       rotarionLerp;
         private int currentHealth;
 
-        private readonly string _Tag_Damage = "Damage";
+        private readonly string _Tag_Damage = "Damage"; 
+        private readonly string _ObjectPool_SwordImpactGold = "SwordImpactGold"; 
         private readonly string _Anim_Para_isMove = "isMove";
         private readonly string _Anim_Para_isAttack = "isAttack"; 
         private readonly string _Anim_Para_MoveBlend = "MoveBlend";
@@ -358,10 +359,8 @@ namespace Sangki.Scripts.Player
                                     anim.SetLayerWeight(1, 0);
                                     anim.SetTrigger(_Anim_Para_Parrying);
                                     feedback_Parrying.PlayFeedbacks();
-                                    // Collider On
-                                    attackColliderSwitch.DoAttack();
                                     // FX
-                                    PoolManager.instance.GetObject("SwordImpactGold", shieldParent.position, Quaternion.identity);
+                                    PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position, Quaternion.identity);
 
                                     isOnShield = false;
                                     isAttack = true;

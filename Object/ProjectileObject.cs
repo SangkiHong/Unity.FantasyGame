@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Arrow : PoolObject
+public class ProjectileObject : PoolObject
 {
 	[SerializeField]
 	private float speed = 30f;
