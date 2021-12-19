@@ -110,10 +110,11 @@ namespace Sangki.Scripts.Enemy
         private NavMeshHit navHit;
         private Vector3 randomDirection, arrowLineEndPos;
 
-        private readonly string m_Tag_Damage = "Damage"; 
-        private readonly string m_String_EnemyHP = "EnemyHP"; 
-        private readonly string m_String_Arrow = "Arrow"; 
-        private readonly string m_String_Fireball = "Fireball"; 
+        private readonly string _Tag_DamageMelee = "DamageMelee";
+        private readonly string _Tag_DamageObject = "DamageObject";
+        private readonly string _String_EnemyHP = "EnemyHP"; 
+        private readonly string _String_Arrow = "Arrow"; 
+        private readonly string _String_Fireball = "Fireball"; 
 
         private int m_AnimPara_isMove,
                     m_AnimPara_MoveBlend,
@@ -298,6 +299,8 @@ namespace Sangki.Scripts.Enemy
                                 break;
                             }
 
+                            if (anim.GetBool(m_AnimPara_isMove)) anim.SetBool(m_AnimPara_isMove, false);
+
                             // Attack Cooldown
                             if (attackCooldown > attackTimer)
                             {
@@ -424,7 +427,7 @@ namespace Sangki.Scripts.Enemy
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other.CompareTag(m_Tag_Damage))
+            if (other.CompareTag(_Tag_DamageMelee) || other.CompareTag(_Tag_DamageObject))
             {
                 if (!isDead && !isDamaged)
                 {
@@ -459,7 +462,7 @@ namespace Sangki.Scripts.Enemy
                         {
                             isHealthBarAttached = true;
 
-                            enemyHealthBar = UIPoolManager.instance.GetObject(m_String_EnemyHP, thisTransform.position).GetComponent<EnemyHealthBar>();
+                            enemyHealthBar = UIPoolManager.instance.GetObject(_String_EnemyHP, thisTransform.position).GetComponent<EnemyHealthBar>();
                             enemyHealthBar.Assign(thisTransform, healthPoint);
                         }
                     }
@@ -512,7 +515,7 @@ namespace Sangki.Scripts.Enemy
                             anim.SetTrigger(m_AnimPara_ShotArrow);
 
                             // Arrow
-                            PoolManager.instance.GetObject(m_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.rotation);
+                            PoolManager.instance.GetObject(_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.rotation);
 
                         }
                     })
@@ -541,7 +544,7 @@ namespace Sangki.Scripts.Enemy
         public void SpellAttack()
         {
             // Fireball
-            PoolManager.instance.GetObject(m_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.rotation);
+            PoolManager.instance.GetObject(_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.rotation);
         }
 #endregion
 

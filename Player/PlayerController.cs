@@ -80,7 +80,7 @@ namespace Sangki.Scripts.Player
                      isCharged,
                      isParrying;
 
-        private Vector3 _Movement;
+        private Vector3 _Movement, _LerpMovement;
         private float fixedDeltaTime, 
                       shieldLayerWeight, 
                       blinkTimer, 
@@ -89,7 +89,8 @@ namespace Sangki.Scripts.Player
                       rotarionLerp;
         private int currentHealth;
 
-        private readonly string _Tag_Damage = "Damage"; 
+        private readonly string _Tag_DamageMelee = "DamageMelee"; 
+        private readonly string _Tag_DamageObject = "DamageObject"; 
         private readonly string _ObjectPool_SwordImpactGold = "SwordImpactGold"; 
         private readonly string _Anim_Para_isMove = "isMove";
         private readonly string _Anim_Para_isAttack = "isAttack"; 
@@ -331,9 +332,8 @@ namespace Sangki.Scripts.Player
             }
             else
             {
-                rotarionLerp += Time.deltaTime * shieldRotateSpeed;
-                if (rotarionLerp > 0.8f) rotarionLerp = 0;
-                thisTransform.rotation = Quaternion.LookRotation(Vector3.Lerp(transform.forward, _Movement, rotarionLerp));
+                _LerpMovement = Vector3.Lerp(transform.forward, _Movement, Time.deltaTime * shieldRotateSpeed);
+                thisTransform.rotation = Quaternion.LookRotation(_LerpMovement);
             }
         }
         #endregion
@@ -341,7 +341,7 @@ namespace Sangki.Scripts.Player
         #region PRIVATE METHOD
         private void OnTriggerEnter(Collider other)
         {
-            if (other.CompareTag(_Tag_Damage))
+            if (other.CompareTag(_Tag_DamageMelee) || other.CompareTag(_Tag_DamageObject))
             {
                 if (!isDead && !isDamaged && !isParrying && !isAttackedShield)
                 {
@@ -352,25 +352,26 @@ namespace Sangki.Scripts.Player
                             // 적의 방향 각도에 따른 쉴드 처리
                             if (Vector3.Dot(thisTransform.forward, Vector3.Normalize(other.transform.position - thisTransform.position)) > 0)
                             {
-                                // 패링 작동
-                                if (parryingTimer < parryingTime) 
+                                if (other.CompareTag(_Tag_DamageMelee))
                                 {
-                                    shieldLayerWeight = 0;
-                                    anim.SetLayerWeight(1, 0);
-                                    anim.SetTrigger(_Anim_Para_Parrying);
-                                    feedback_Parrying.PlayFeedbacks();
-                                    // FX
-                                    PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position, Quaternion.identity);
+                                    // 패링 작동
+                                    if (parryingTimer < parryingTime)
+                                    {
+                                        shieldLayerWeight = 0;
+                                        anim.SetLayerWeight(1, 0);
+                                        anim.SetTrigger(_Anim_Para_Parrying);
+                                        feedback_Parrying.PlayFeedbacks();
+                                        // FX
+                                        PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position, Quaternion.identity);
 
-                                    isOnShield = false;
-                                    isAttack = true;
-                                    isParrying = true;
+                                        isOnShield = false;
+                                        isAttack = true;
+                                        isParrying = true;
+                                        return;
+                                    }
                                 }
                                 // 일반 쉴드
-                                else
-                                {
-                                    feedback_ShieldDefense.PlayFeedbacks();
-                                }
+                                feedback_ShieldDefense.PlayFeedbacks();
                                 return;
                             }
                         }
