@@ -1,7 +1,7 @@
 using UnityEngine;
 using MoreMountains.Feedbacks;
 
-namespace Sangki.Scripts.Player
+namespace Sangki.Player
 {
     public class PlayerController : MonoBehaviour
     {
@@ -22,7 +22,9 @@ namespace Sangki.Scripts.Player
         [Header("STATS")]
         public int attackPower;
         [SerializeField]
-        private int health;
+        private int maxHealth;
+        [SerializeField]
+        private int currentHealth;
         [SerializeField]
         private float speed;
         [SerializeField]
@@ -50,6 +52,8 @@ namespace Sangki.Scripts.Player
         private MMFeedbacks feedback_ShieldDefense;
         [SerializeField]
         private MMFeedbacks feedback_Parrying;
+        [SerializeField]
+        private MMFeedbacks feedback_Death;
 
         [Header("PARTICLE")]
         [SerializeField]
@@ -57,14 +61,9 @@ namespace Sangki.Scripts.Player
         [SerializeField]
         private ParticleSystem particle_ChargeComplete;
 
-        public delegate void AttackEventHandler(float damage);
-
-        /// <summary>
-        /// Attack Call Back
-        /// </summary>
-        public event AttackEventHandler attackEventHandler;
-
         private Transform thisTransform;
+
+        private Vector3 _Movement, _LerpMovement;
 
         [SerializeField]
         public bool isDead;
@@ -80,14 +79,11 @@ namespace Sangki.Scripts.Player
                      isCharged,
                      isParrying;
 
-        private Vector3 _Movement, _LerpMovement;
         private float fixedDeltaTime, 
                       shieldLayerWeight, 
                       blinkTimer, 
                       chargeTimer,
-                      parryingTimer,
-                      rotarionLerp;
-        private int currentHealth;
+                      parryingTimer;
 
         private readonly string _Tag_DamageMelee = "DamageMelee"; 
         private readonly string _Tag_DamageObject = "DamageObject"; 
@@ -110,7 +106,7 @@ namespace Sangki.Scripts.Player
 
             thisTransform = this.transform;
             fixedDeltaTime = Time.fixedDeltaTime;
-            currentHealth = health;
+            currentHealth = maxHealth;
         }
 
         private void FixedUpdate()
@@ -237,7 +233,7 @@ namespace Sangki.Scripts.Player
 
         public void Jump()
         {
-            if (isOnGround && !anim.GetBool(_Anim_Para_isAttack))
+            if (isOnGround && isOnContol && !anim.GetBool(_Anim_Para_isAttack))
             {
                 // Animation
                 anim.SetTrigger(_Anim_Para_Jump);
@@ -256,6 +252,36 @@ namespace Sangki.Scripts.Player
             }
         }
 
+        private void Rotate()
+        {
+            if (!isOnShield) 
+            {
+                thisTransform.rotation = Quaternion.LookRotation(Vector3.RotateTowards(transform.forward, _Movement, 0.3f, 0));
+            }
+            else
+            {
+                _LerpMovement = Vector3.Lerp(transform.forward, _Movement, Time.deltaTime * shieldRotateSpeed);
+                thisTransform.rotation = Quaternion.LookRotation(_LerpMovement);
+            }
+        }
+
+        private bool IsCheckGrounded()
+        {
+            // CharacterController.IsGrounded가 true라면 Raycast를 사용하지 않고 판정 종료
+            if (characterController.isGrounded) return true;
+            // 발사하는 광선의 초기 위치와 방향
+            // 약간 신체에 박혀 있는 위치로부터 발사하지 않으면 제대로 판정할 수 없을 때가 있다.
+            var maxDistance = 0.2f;
+
+            var ray = new Ray(this.transform.position + Vector3.up * 0.1f, Vector3.down * maxDistance);
+
+            Debug.DrawRay(transform.position + Vector3.up * 0.1f, Vector3.down * maxDistance, Color.red);
+
+            return Physics.Raycast(ray, maxDistance, _fieldLayer);
+        }
+        #endregion
+
+        #region ATTACK & DAMAGE
         public void Attack(bool isPush)
         {
             if (!isAttack)
@@ -307,10 +333,9 @@ namespace Sangki.Scripts.Player
                 isOnShield = isBlock;
 
                 // 초기화
-                if (!isBlock) 
+                if (!isBlock)
                 {
                     parryingTimer = 0;
-                    rotarionLerp = 0;
                 }
             }
         }
@@ -324,35 +349,20 @@ namespace Sangki.Scripts.Player
             attackColliderSwitch.DoAttack();
         }
 
-        private void Rotate()
+        public void OnDamageTrigger(GameObject triggerObejct, int damageAmount)
         {
-            if (!isOnShield) 
+            if (!isDead && !isDamaged && !isParrying && !isAttackedShield)
             {
-                thisTransform.rotation = Quaternion.LookRotation(Vector3.RotateTowards(transform.forward, _Movement, 0.3f, 0));
-            }
-            else
-            {
-                _LerpMovement = Vector3.Lerp(transform.forward, _Movement, Time.deltaTime * shieldRotateSpeed);
-                thisTransform.rotation = Quaternion.LookRotation(_LerpMovement);
-            }
-        }
-        #endregion
-
-        #region PRIVATE METHOD
-        private void OnTriggerEnter(Collider other)
-        {
-            if (other.CompareTag(_Tag_DamageMelee) || other.CompareTag(_Tag_DamageObject))
-            {
-                if (!isDead && !isDamaged && !isParrying && !isAttackedShield)
+                if (triggerObejct.CompareTag(_Tag_DamageMelee) || triggerObejct.CompareTag(_Tag_DamageObject))
                 {
                     if (isOnShield)
                     {
                         if (!isAttack)
                         {
                             // 적의 방향 각도에 따른 쉴드 처리
-                            if (Vector3.Dot(thisTransform.forward, Vector3.Normalize(other.transform.position - thisTransform.position)) > 0)
+                            if (Vector3.Dot(thisTransform.forward, Vector3.Normalize(triggerObejct.transform.position - thisTransform.position)) > 0)
                             {
-                                if (other.CompareTag(_Tag_DamageMelee))
+                                if (triggerObejct.CompareTag(_Tag_DamageMelee))
                                 {
                                     // 패링 작동
                                     if (parryingTimer < parryingTime)
@@ -378,7 +388,6 @@ namespace Sangki.Scripts.Player
                     }
 
                     // 피해 입음
-                    //currentHealth -= damage;
                     isDamaged = true;
                     isCharging = false;
                     isCharged = false;
@@ -386,36 +395,26 @@ namespace Sangki.Scripts.Player
                     attackColliderSwitch.isCancel = true;
                     ShieldBlock(false);
                     feedback_Attack.StopFeedbacks();
-                    feedback_Knockback.PlayFeedbacks();
+
+                    currentHealth -= damageAmount;
+                    // Damaged
+                    if (currentHealth > 0)
+                    {
+                        feedback_Knockback.PlayFeedbacks();
+                    }
+                    // Death
+                    else
+                    {
+                        isDead = true;
+                        isAttack = false;
+                        isParrying = false;
+                        isOnContol = false;
+                        shieldLayerWeight = 0;
+                        anim.SetLayerWeight(1, 0);
+                        feedback_Death.PlayFeedbacks();
+                    }
                 }
             }
-        }
-
-        /// <summary>
-        /// 이벤트 메소드들을 호출한다
-        /// </summary>
-        void CallEventHandlerMethods(float damage)
-        {
-            // 공격 콜백
-            if (attackEventHandler != null)
-            {
-                attackEventHandler(damage);
-                attackEventHandler = null;
-            }
-        }
-        private bool IsCheckGrounded()
-        {
-            // CharacterController.IsGrounded가 true라면 Raycast를 사용하지 않고 판정 종료
-            if (characterController.isGrounded) return true;
-            // 발사하는 광선의 초기 위치와 방향
-            // 약간 신체에 박혀 있는 위치로부터 발사하지 않으면 제대로 판정할 수 없을 때가 있다.
-            var maxDistance = 0.2f;
-
-            var ray = new Ray(this.transform.position + Vector3.up * 0.1f, Vector3.down * maxDistance);
-
-            Debug.DrawRay(transform.position + Vector3.up * 0.1f, Vector3.down * maxDistance, Color.red);
-
-            return Physics.Raycast(ray, maxDistance, _fieldLayer);
         }
         #endregion
     }

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sangki.Scripts.Object
+namespace Sangki.Object
 {
     public class CameraFollow : MonoBehaviour
     {

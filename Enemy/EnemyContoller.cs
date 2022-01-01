@@ -1,4 +1,4 @@
-using System;
+using Sangki.Player;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
@@ -6,7 +6,7 @@ using MoreMountains.Feedbacks;
 using BehaviorDesigner.Runtime.Tasks.Movement;
 using DG.Tweening;
 
-namespace Sangki.Scripts.Enemy
+namespace Sangki.Enemy
 {
     [RequireComponent(typeof(NavMeshAgent))]
     [RequireComponent(typeof(Animator))]
@@ -25,6 +25,10 @@ namespace Sangki.Scripts.Enemy
         [Header("ENEMY ABILITY")]
         [SerializeField]
         private int healthPoint = 3;
+        [SerializeField]
+        private int meleeAttackPower = 1;
+        [SerializeField]
+        private int secondAttackPower = 1;
         [SerializeField]
         private float attackCooldown = 2.5f;
         [SerializeField]
@@ -226,18 +230,20 @@ namespace Sangki.Scripts.Enemy
 
         private IEnumerator StateCoroutine()
         {
+            yield return ws_State;
+
             while (!isDead)
             {
                 switch (enemyState)
                 {
                     case EnemyState.Idle:
-                        Rader();
+                        if (!PlayerController.Instance.isDead) Rader();
                         break;
                     case EnemyState.Patrol:
-                        Rader();
+                        if (!PlayerController.Instance.isDead) Rader();
                         break;
                     case EnemyState.Seek:
-                        Rader();
+                        if (!PlayerController.Instance.isDead) Rader();
                         if (!navAgent.hasPath)
                         {
                             if (seekIdleTimer > seekIdleDuration)
@@ -493,6 +499,7 @@ namespace Sangki.Scripts.Enemy
             if (type == 0)
             {
                 anim.SetTrigger(m_AnimPara_Attack);
+                //Player.PlayerController.AttackEventHandler
             }
             // SHOT ARROW
             if (type == 1)
@@ -588,8 +595,10 @@ namespace Sangki.Scripts.Enemy
 
         private bool CheckPlayerAlive()
         {
-            if (Player.PlayerController.Instance.isDead)
+            if (PlayerController.Instance.isDead)
             {
+                anim.SetBool(m_AnimPara_isFight, false);
+                navAgent.ResetPath();
                 enemyState = EnemyState.Seek;
                 return false;
             }

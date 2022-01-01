@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using MoreMountains.Feedbacks;
 using BehaviorDesigner.Runtime.Tasks.Movement;
-using Sangki.Scripts;
+using Sangki;
 
 public class EnemyDummy : MonoBehaviour
 {

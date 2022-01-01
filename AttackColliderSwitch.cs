@@ -3,7 +3,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Sangki.Scripts
+namespace Sangki
 {
     public class AttackColliderSwitch : MonoBehaviour
     {
