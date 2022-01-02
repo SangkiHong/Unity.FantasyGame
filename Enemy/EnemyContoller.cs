@@ -1,10 +1,13 @@
+using BehaviorDesigner.Runtime.Tasks.Movement;
+using DG.Tweening;
+using MoreMountains.Feedbacks;
 using Sangki.Player;
+using Sangki.Object;
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
-using MoreMountains.Feedbacks;
-using BehaviorDesigner.Runtime.Tasks.Movement;
-using DG.Tweening;
+using Sirenix.OdinInspector;
 
 namespace Sangki.Enemy
 {
@@ -13,94 +16,142 @@ namespace Sangki.Enemy
     public class EnemyContoller : MonoBehaviour
     {
         #region VARIABLE
+        #region ABILITY
+        private enum EnemyType { Human, Generic }
         private enum EnemyClass { Normal, Archer, Wizard }
         private enum EnemyState { Idle, Patrol, Seek, Chase, Attack, Dead }
+        [Serializable]
+        public struct DamageAbility
+        {
+            public DamageTrigger damageTrigger;
+            public int damageAmount;
+        }
 
+        [SerializeField]
+        private EnemyType enemyType;
+        [ShowIf("enemyType", EnemyType.Human)]
         [SerializeField]
         private EnemyClass enemyClass;
         [SerializeField]
         private EnemyState enemyState;
 
-        #region ENEMY ABILITY
-        [Header("ENEMY ABILITY")]
+        #region ENEMY STATS
+        [Header("ENEMY STATS")]
+        [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
         private int healthPoint = 3;
-        [SerializeField]
-        private int meleeAttackPower = 1;
-        [SerializeField]
-        private int secondAttackPower = 1;
-        [SerializeField]
-        private float attackCooldown = 2.5f;
+        [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
         private float lookSpeed = 1f;
+        [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
         private float blinkTime = 0.5f;
+        [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
         private float navMeshLinkSpeed = 0.5f;
+
+        [Header("ENEMY ATTACK")]
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private float attackCooldown = 2.5f;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private DamageAbility[] damageAbilities;
+        #endregion
         #endregion
 
         #region SEEK AND WONDER
         [Header("SEEK AND WONDER")]
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private float seekDistance = 10f;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private float seekIdleDuration = 5f;
-        #endregion
 
-        #region SEARCH PLAYER RADER
         [Header("SEARCH PLAYER RADER")]
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private bool debugRader;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
-        private string targetTag;
+        private string targetTag = "Player";
+        [FoldoutGroup("SEEK AND WONDER")]
         public LayerMask objectLayerMask;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private LayerMask ignoreLayerMask;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private float fieldOfViewAngle = 90;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private float viewDistance = 1000;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private Vector3 offset;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private Vector3 targetOffset;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private bool usePhysics2D;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private float angleOffset2D;
+        [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private bool useTargetBone;
+        [FoldoutGroup("SEEK AND WONDER")]
+        [ShowIf("useTargetBone")]
         [SerializeField]
         private HumanBodyBones targetBone;
         #endregion
 
         #region COMPONENTS
         [Header("COMPONENTS")]
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private Animator anim;
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private NavMeshAgent navAgent;
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private AttackColliderSwitch attackColliderSwitch;
+        [ShowIf("enemyType", EnemyType.Human)]
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private RuntimeAnimatorController archerAC, wizardAC;
+        [FoldoutGroup("COMPONENTS")]
+        [SerializeField]
+        private bool canShotProjectile;
+        [ShowIf("canShotProjectile")]
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private LineRenderer shotLineRenderer;
+        [ShowIf("canShotProjectile")]
+        [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private Transform arrowLineStartPos;
         #endregion
 
         #region EQUIPMENT
+        [ShowIf("enemyType", EnemyType.Human)]
+        [FoldoutGroup("EQUIPMENT")]
         [SerializeField]
         private GameObject[] equipments;
         #endregion
 
         #region FEEDBACK
         [Header("FEEDBACK")]
+        [FoldoutGroup("FEEDBACK")]
         [SerializeField]
         private MMFeedbacks feedback_Attack;
+        [FoldoutGroup("FEEDBACK")]
         [SerializeField]
         private MMFeedbacks feedback_Knockback;
+        [FoldoutGroup("FEEDBACK")]
         [SerializeField]
         private MMFeedbacks feedback_Dead;
         #endregion
@@ -139,7 +190,7 @@ namespace Sangki.Enemy
         #endregion
         #endregion
 
-        #region AWAKE, ONENABLE, LOOP, UPDATE
+        #region AWAKE, ONENABLE
         private void Awake()
         {
             thisTransform = this.transform;
@@ -148,25 +199,30 @@ namespace Sangki.Enemy
             defaultSpeed = navAgent.speed;
             defaultStopDist = navAgent.stoppingDistance;
 
-            thisCollider = this.GetComponent<Collider>();
+            if (!anim) anim = this.GetComponent<Animator>();
+            if (!navAgent) navAgent = this.GetComponent<NavMeshAgent>();
+            if (!thisCollider) thisCollider = this.GetComponent<Collider>();
 
-            if (enemyClass == EnemyClass.Normal)
+            if (enemyType == EnemyType.Human)
             {
-                equipments[0].SetActive(true);
-            }
-            else if (enemyClass == EnemyClass.Archer)
-            {
-                equipments[1].SetActive(true);
-                anim.runtimeAnimatorController = archerAC;
+                if (enemyClass == EnemyClass.Normal)
+                {
+                    equipments[0].SetActive(true);
+                }
+                else if (enemyClass == EnemyClass.Archer)
+                {
+                    equipments[1].SetActive(true);
+                    anim.runtimeAnimatorController = archerAC;
 
-                m_AnimPara_Aimming = anim.GetParameter(9).nameHash;
-                m_AnimPara_ShotArrow = anim.GetParameter(10).nameHash;
-            }
-            else if (enemyClass == EnemyClass.Wizard)
-            {
-                equipments[2].SetActive(true);
-                anim.runtimeAnimatorController = wizardAC;
-                m_AnimPara_Spell = anim.GetParameter(9).nameHash;
+                    m_AnimPara_Aimming = anim.GetParameter(9).nameHash;
+                    m_AnimPara_ShotArrow = anim.GetParameter(10).nameHash;
+                }
+                else if (enemyClass == EnemyClass.Wizard)
+                {
+                    equipments[2].SetActive(true);
+                    anim.runtimeAnimatorController = wizardAC;
+                    m_AnimPara_Spell = anim.GetParameter(9).nameHash;
+                }
             }
 
             m_AnimPara_MoveBlend = anim.GetParameter(0).nameHash;
@@ -178,7 +234,10 @@ namespace Sangki.Enemy
             m_AnimPara_Jump = anim.GetParameter(7).nameHash;
             m_AnimPara_MeleeSpeed = anim.GetParameter(8).nameHash;
 
-
+            for (int i = 0; i < damageAbilities.Length; i++)
+            {
+                damageAbilities[i].damageTrigger.damageAmount = damageAbilities[i].damageAmount;
+            }
         }
 
         private void OnEnable()
@@ -208,26 +267,35 @@ namespace Sangki.Enemy
                 enemyHealthBar = null;
             }
 
-
-            if (enemyClass == EnemyClass.Normal)
+            if (enemyType == EnemyType.Human)
+            {
+                if (enemyClass == EnemyClass.Normal)
+                {
+                    attackDist = navAgent.stoppingDistance + 0.1f;
+                    anim.SetFloat(m_AnimPara_MeleeSpeed, 1.1f);
+                }
+                else if (enemyClass == EnemyClass.Archer)
+                {
+                    attackDist = 12;
+                    anim.SetFloat(m_AnimPara_MeleeSpeed, 1f);
+                }
+                else if (enemyClass == EnemyClass.Wizard)
+                {
+                    attackDist = 10;
+                    anim.SetFloat(m_AnimPara_MeleeSpeed, 0.9f);
+                }
+            }
+            else
             {
                 attackDist = navAgent.stoppingDistance + 0.1f;
-                anim.SetFloat(m_AnimPara_MeleeSpeed, 1.1f);
-            }
-            else if (enemyClass == EnemyClass.Archer)
-            {
-                attackDist = 12;
                 anim.SetFloat(m_AnimPara_MeleeSpeed, 1f);
-            }
-            else if (enemyClass == EnemyClass.Wizard)
-            {
-                attackDist = 10;
-                anim.SetFloat(m_AnimPara_MeleeSpeed, 0.9f);
             }
 
             StartCoroutine(StateCoroutine());
         }
+        #endregion
 
+        #region LOOP, UPDATE
         private IEnumerator StateCoroutine()
         {
             yield return ws_State;
@@ -319,20 +387,27 @@ namespace Sangki.Enemy
                                 {
                                     attackTimer = 0;
 
-                                    if (targetDist <= navAgent.stoppingDistance + 0.1f)
+                                    if (enemyType == EnemyType.Human)
                                     {
-                                        Attacks();
+                                        if (targetDist <= navAgent.stoppingDistance + 0.1f)
+                                        {
+                                            Attacks();
+                                        }
+                                        else
+                                        {
+                                            if (enemyClass == EnemyClass.Archer)
+                                            {
+                                                Attacks(1);
+                                            }
+                                            else if (enemyClass == EnemyClass.Wizard)
+                                            {
+                                                Attacks(2);
+                                            }
+                                        }
                                     }
                                     else
                                     {
-                                        if (enemyClass == EnemyClass.Archer)
-                                        {
-                                            Attacks(1);
-                                        }
-                                        else if (enemyClass == EnemyClass.Wizard)
-                                        {
-                                            Attacks(2);
-                                        }
+                                        Attacks();
                                     }
                                 }
                             }
@@ -431,6 +506,7 @@ namespace Sangki.Enemy
         }
         #endregion
 
+        #region TRIGGER
         private void OnTriggerEnter(Collider other)
         {
             if (other.CompareTag(_Tag_DamageMelee) || other.CompareTag(_Tag_DamageObject))
@@ -491,6 +567,7 @@ namespace Sangki.Enemy
                 }
             }
         }
+        #endregion
 
         #region ATTACK
         private void Attacks(int type = 0)
@@ -499,7 +576,6 @@ namespace Sangki.Enemy
             if (type == 0)
             {
                 anim.SetTrigger(m_AnimPara_Attack);
-                //Player.PlayerController.AttackEventHandler
             }
             // SHOT ARROW
             if (type == 1)
@@ -553,8 +629,9 @@ namespace Sangki.Enemy
             // Fireball
             PoolManager.instance.GetObject(_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.rotation);
         }
-#endregion
+        #endregion
 
+        #region UTILITY
         // TARGET SEARCH RADER
         private void Rader()
         {
@@ -618,5 +695,6 @@ namespace Sangki.Enemy
         {
             MovementUtility.ClearCache();
         }
+        #endregion
     }
 }

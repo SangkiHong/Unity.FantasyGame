@@ -5,8 +5,8 @@ namespace Sangki.Object
 {
     public class DamageTrigger : MonoBehaviour
     {
-        [SerializeField]
-        private int damageAmount = 1;
+        [HideInInspector]
+        public int damageAmount = 1;
 
         GameObject thisGameobejct;
         readonly string m_tag_Player = "Player";

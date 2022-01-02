@@ -21,7 +21,7 @@ public class EnemyHealthBar : PoolObject
     {
         if (isAssign)
         {
-            thisTransform.position = targetTransform.position + Vector3.up * offsetY;
+            thisTransform.position = Vector3.Lerp(thisTransform.position, targetTransform.position + Vector3.up * offsetY, 0.3f);
         }
     }
 
