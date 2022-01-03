@@ -515,7 +515,7 @@ namespace Sangki.Enemy
                 {
                     if (other.gameObject.layer == 9) // Player Attack
                     {
-                        currentHealth -= Player.PlayerController.Instance.attackPower;
+                        currentHealth -= PlayerController.Instance.attackPower;
                     }
                     else if (other.gameObject.layer == 10) // Object Damage
                     {
@@ -533,8 +533,7 @@ namespace Sangki.Enemy
                         if (enemyState != EnemyState.Attack)
                         {
                             anim.SetBool(m_AnimPara_isFight, true);
-                            //anim.SetBool(m_AnimPara_isMove, true);
-                            targetObject = Player.PlayerController.Instance.gameObject;
+                            targetObject = PlayerController.Instance.gameObject;
                             navAgent.speed = defaultSpeed;
                             navAgent.stoppingDistance = defaultStopDist;
                             enemyState = EnemyState.Attack;

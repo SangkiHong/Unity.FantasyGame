@@ -161,7 +161,7 @@ namespace Sangki.Player
                 if (Input.GetKey(KeyCode.Space)) Jump();
 
                 // ½¯µå ¸ð¼Ç
-                if (!anim.GetBool(_Anim_Para_isAttack) && !isParrying)
+                if (!anim.GetBool(_Anim_Para_isAttack) && !isParrying && !isDamaged)
                 {
                     if (isOnShield)
                     {
