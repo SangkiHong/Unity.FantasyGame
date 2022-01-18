@@ -17,6 +17,8 @@ namespace Sangki.Enemy
     {
         #region VARIABLE
         #region ABILITY
+        [SerializeField]
+        private bool noHit;
         private enum EnemyType { Human, Generic }
         private enum EnemyClass { Normal, Archer, Wizard }
         private enum EnemyState { Idle, Patrol, Seek, Chase, Attack, Dead }
@@ -49,6 +51,9 @@ namespace Sangki.Enemy
         [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
         private float navMeshLinkSpeed = 0.5f;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private bool isBoss;
 
         [Header("ENEMY ATTACK")]
         [FoldoutGroup("ENEMY ABILITY")]
@@ -56,7 +61,27 @@ namespace Sangki.Enemy
         private float attackCooldown = 2.5f;
         [FoldoutGroup("ENEMY ABILITY")]
         [SerializeField]
+        private float attackStepsize = 0.5f;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private float dodgeChance = 0.3f;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private float dodgeAngle = 30;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private float dodgeDistance = 5f;
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
         private DamageAbility[] damageAbilities;
+        [ShowIf("isBoss")]
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private EnemyBoss enemyBoss;
+        [ShowIf("isBoss")]
+        [FoldoutGroup("ENEMY ABILITY")]
+        [SerializeField]
+        private float bossSkillCooldown = 6f;
         #endregion
         #endregion
 
@@ -162,6 +187,7 @@ namespace Sangki.Enemy
         private EnemyHealthBar enemyHealthBar;
         private Collider thisCollider;
         private WaitForSeconds ws_State;
+        private Rigidbody _rigidbody;
         private NavMeshHit navHit;
         private Vector3 randomDirection, arrowLineEndPos;
 
@@ -181,12 +207,13 @@ namespace Sangki.Enemy
                     m_AnimPara_Jump,
                     m_AnimPara_Aimming,
                     m_AnimPara_ShotArrow,
-                    m_AnimPara_Spell;
+                    m_AnimPara_Spell,
+                    m_AnimPara_Dodge;
 
-        private float stateTime, blinkTimer, attackTimer, seekIdleTimer;
+        private float stateTime, blinkTimer, attackTimer, seekIdleTimer, skillTimer;
         private float defaultSpeed, defaultStopDist, attackDist, targetWeight, layerChangeSpeed;
         private int currentHealth, targetLayer;
-        private bool isDead, isDamaged, isHealthBarAttached, isNavMeshLink, isOnShotLine, isChangeLayerWeight;
+        private bool isDead, isDamaged, isDodge, isHealthBarAttached, isNavMeshLink, isOnShotLine, isChangeLayerWeight, isCastingSkill;
         #endregion
         #endregion
 
@@ -202,27 +229,33 @@ namespace Sangki.Enemy
             if (!anim) anim = this.GetComponent<Animator>();
             if (!navAgent) navAgent = this.GetComponent<NavMeshAgent>();
             if (!thisCollider) thisCollider = this.GetComponent<Collider>();
+            if (!_rigidbody) _rigidbody = this.GetComponent<Rigidbody>();
 
             if (enemyType == EnemyType.Human)
             {
                 if (enemyClass == EnemyClass.Normal)
                 {
                     equipments[0].SetActive(true);
+
                 }
                 else if (enemyClass == EnemyClass.Archer)
                 {
                     equipments[1].SetActive(true);
                     anim.runtimeAnimatorController = archerAC;
 
-                    m_AnimPara_Aimming = anim.GetParameter(9).nameHash;
-                    m_AnimPara_ShotArrow = anim.GetParameter(10).nameHash;
+                    m_AnimPara_Aimming = anim.GetParameter(10).nameHash;
+                    m_AnimPara_ShotArrow = anim.GetParameter(11).nameHash;
                 }
                 else if (enemyClass == EnemyClass.Wizard)
                 {
                     equipments[2].SetActive(true);
                     anim.runtimeAnimatorController = wizardAC;
-                    m_AnimPara_Spell = anim.GetParameter(9).nameHash;
+                    m_AnimPara_Spell = anim.GetParameter(10).nameHash;
                 }
+            }
+            if (isBoss)
+            {
+                if (enemyBoss.boss == EnemyBoss.BossName.BudKing) m_AnimPara_Spell = anim.GetParameter(9).nameHash;
             }
 
             m_AnimPara_MoveBlend = anim.GetParameter(0).nameHash;
@@ -233,6 +266,7 @@ namespace Sangki.Enemy
             m_AnimPara_Dead = anim.GetParameter(6).nameHash;
             m_AnimPara_Jump = anim.GetParameter(7).nameHash;
             m_AnimPara_MeleeSpeed = anim.GetParameter(8).nameHash;
+            m_AnimPara_Dodge = anim.GetParameter(9).nameHash;
 
             for (int i = 0; i < damageAbilities.Length; i++)
             {
@@ -253,13 +287,15 @@ namespace Sangki.Enemy
             isHealthBarAttached = false;
             blinkTimer = 0;
             attackTimer = attackCooldown * 0.7f;
-            seekIdleTimer = 0; 
+            seekIdleTimer = 0;
+            skillTimer = 0;
             enemyState = EnemyState.Seek;
             anim.SetFloat(m_AnimPara_MoveBlend, 0);
             anim.SetBool(m_AnimPara_isMove, false);
             anim.SetBool(m_AnimPara_isFight, false);
             anim.SetBool(m_AnimPara_isAttack, false);
             thisCollider.enabled = true;
+
 
             if (enemyHealthBar) 
             {
@@ -299,6 +335,8 @@ namespace Sangki.Enemy
         private IEnumerator StateCoroutine()
         {
             yield return ws_State;
+
+            PlayerController.Instance.OnPlayerAttack += DodgeAttack;
 
             while (!isDead)
             {
@@ -378,7 +416,7 @@ namespace Sangki.Enemy
                             // Attack Cooldown
                             if (attackCooldown > attackTimer)
                             {
-                                if (!isDamaged) attackTimer += stateTime;
+                                if (!isDamaged && !isCastingSkill) attackTimer += stateTime;
                             }
                             // Do Attack
                             else
@@ -431,6 +469,23 @@ namespace Sangki.Enemy
                     }
                 }
 
+                //Boss Skill
+                if (isBoss && !isCastingSkill && !anim.GetBool(m_AnimPara_isAttack))
+                {
+                    if (enemyState == EnemyState.Chase || enemyState == EnemyState.Attack)
+                    {
+                        if (skillTimer < bossSkillCooldown)
+                        {
+                            skillTimer += stateTime;
+                        }
+                        else
+                        {
+                            StopDuringCastingSkill();
+                            anim.SetTrigger(m_AnimPara_Spell);
+                        }
+                    }
+                }
+
                 yield return ws_State;
             }
         }
@@ -477,17 +532,20 @@ namespace Sangki.Enemy
                 }
             }
 
-            if (navAgent.isOnOffMeshLink && !isNavMeshLink)
+            if (!isDead && !isDodge)
             {
-                isNavMeshLink = true;
-                navAgent.speed *= navMeshLinkSpeed;
-                anim.SetTrigger(m_AnimPara_Jump);
-            }
-            else if (!navAgent.isOnOffMeshLink && isNavMeshLink)
-            {
-                isNavMeshLink = false;
-                navAgent.velocity = Vector3.zero;
-                navAgent.speed = defaultSpeed;
+                if (navAgent.isOnOffMeshLink && !isNavMeshLink)
+                {
+                    isNavMeshLink = true;
+                    navAgent.speed *= navMeshLinkSpeed;
+                    anim.SetTrigger(m_AnimPara_Jump);
+                }
+                else if (!navAgent.isOnOffMeshLink && isNavMeshLink)
+                {
+                    isNavMeshLink = false;
+                    navAgent.velocity = Vector3.zero;
+                    navAgent.speed = defaultSpeed;
+                }
             }
 
             if (isChangeLayerWeight)
@@ -511,7 +569,7 @@ namespace Sangki.Enemy
         {
             if (other.CompareTag(_Tag_DamageMelee) || other.CompareTag(_Tag_DamageObject))
             {
-                if (!isDead && !isDamaged)
+                if (!isDead && !isDamaged && !noHit)
                 {
                     if (other.gameObject.layer == 9) // Player Attack
                     {
@@ -521,6 +579,7 @@ namespace Sangki.Enemy
                     {
                         currentHealth -= 1;
                     }
+
                     navAgent.isStopped = true;
                     isDamaged = true;
                     attackColliderSwitch.isCancel = true;
@@ -528,6 +587,7 @@ namespace Sangki.Enemy
 
                     if (currentHealth > 0)
                     {
+                        feedback_Knockback.StopFeedbacks();
                         feedback_Knockback.PlayFeedbacks();
 
                         if (enemyState != EnemyState.Attack)
@@ -568,7 +628,7 @@ namespace Sangki.Enemy
         }
         #endregion
 
-        #region ATTACK
+        #region ATTACK or BEHAVIOR
         private void Attacks(int type = 0)
         {
             // MELLEE
@@ -597,7 +657,7 @@ namespace Sangki.Enemy
                             anim.SetTrigger(m_AnimPara_ShotArrow);
 
                             // Arrow
-                            PoolManager.instance.GetObject(_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.rotation);
+                            PoolManager.instance.GetObject(_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.eulerAngles);
 
                         }
                     })
@@ -621,16 +681,66 @@ namespace Sangki.Enemy
             feedback_Attack?.PlayFeedbacks();
             // Collider On
             attackColliderSwitch?.DoAttack();
+            // Step
+            navAgent.Move(thisTransform.forward * attackStepsize);
         }
 
         public void SpellAttack()
         {
             // Fireball
-            PoolManager.instance.GetObject(_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.rotation);
+            PoolManager.instance.GetObject(_String_Fireball, arrowLineStartPos.position, arrowLineStartPos.eulerAngles);
+        }
+
+        public void CastSkill()
+        {
+            if (isBoss)enemyBoss.BossSkill();
+        }
+
+        public void DodgeAttack(int dodge = 0)
+        {
+            if (dodge == 0)
+            {
+                if (enemyState == EnemyState.Attack && UnityEngine.Random.value < dodgeChance)
+                {
+                    // NavMesh의 길이 있는지 파악 후 위치로 닷지
+                    if (NavMesh.SamplePosition(GetDodgePoint(dodgeAngle), out navHit, seekDistance, NavMesh.AllAreas))
+                    {
+                        isDodge = true;
+                        navAgent.isStopped = true;
+                        thisTransform.DOMove(navHit.position, 1f).SetEase(Ease.OutCirc);
+                        anim.SetTrigger(m_AnimPara_Dodge);
+                    }
+                }
+            }
+            else
+            {
+                isDodge = false;
+                navAgent.Warp(thisTransform.position);
+                navAgent.isStopped = false;
+            }
         }
         #endregion
 
         #region UTILITY
+        // in Casting Skill
+        public void StopDuringCastingSkill(bool isStop = true)
+        {
+            if (isStop)
+            {
+                isCastingSkill = true;
+                navAgent.isStopped = true;
+                anim.SetBool(m_AnimPara_isFight, true);
+                anim.SetBool(m_AnimPara_isMove, false);
+            }
+            else
+            {
+                isCastingSkill = false;
+                navAgent.isStopped = false;
+                anim.SetBool(m_AnimPara_isFight, false);
+                anim.SetBool(m_AnimPara_isMove, true);
+                skillTimer = 0;
+            }
+        }
         // TARGET SEARCH RADER
         private void Rader()
         {
@@ -652,6 +762,16 @@ namespace Sangki.Enemy
             NavMesh.SamplePosition(randomDirection, out navHit, distance, NavMesh.AllAreas);
 
             return navHit.position;
+        }
+
+        // GET DODGE POINT
+        private Vector3 GetDodgePoint(float angle)
+        {
+            float randomVal = UnityEngine.Random.value; 
+            if (randomVal < 0.5f) randomVal *= -1f; // 반원에서 방향을 랜덤 값으로 정함
+            angle = randomVal * angle; // 0 ~ angle 사이의 각을 구함
+
+            return thisTransform.position + (thisTransform.rotation * Quaternion.Euler(0, angle, 0)) * (Vector3.forward * -dodgeDistance);
         }
 
         // FIGHT MODE 시 타겟 바라보기
@@ -693,6 +813,8 @@ namespace Sangki.Enemy
         private void OnDisable()
         {
             MovementUtility.ClearCache();
+
+            PlayerController.Instance.OnPlayerAttack -= DodgeAttack;
         }
         #endregion
     }

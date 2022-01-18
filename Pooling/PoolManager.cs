@@ -78,7 +78,30 @@ public class PoolManager : MonoBehaviour
 		}
 	}
 
-	public GameObject GetObject(string poolKey, Vector3 position, Quaternion rotation) 
+	public GameObject GetObject(string poolKey, Vector3 position)
+	{
+		if (poolPrefabs.ContainsKey(poolKey))
+		{
+			if (poolFreeDictionary[poolKey].Count > 0)
+			{
+				ObjectInstance obj = poolFreeDictionary[poolKey].Dequeue();
+				poolUsedDictionary[poolKey].Add(obj.gameObject.GetInstanceID(), obj);
+				obj.Awake(position);
+				return obj.gameObject;
+			}
+			else
+			{
+				ObjectInstance newObject = new ObjectInstance(Instantiate(poolPrefabs[poolKey]) as GameObject);
+				poolUsedDictionary[poolKey].Add(newObject.gameObject.GetInstanceID(), newObject);
+				newObject.SetParent(poolParents[poolKey].transform);
+				newObject.Awake(position);
+				return newObject.gameObject;
+			}
+		}
+		return null;
+	}
+
+	public GameObject GetObject(string poolKey, Vector3 position, Vector3 rotation) 
 	{
 		if (poolPrefabs.ContainsKey (poolKey)) 
 		{
@@ -124,11 +147,19 @@ public class PoolManager : MonoBehaviour
 			poolObjectScript = gameObject.GetComponent<PoolObject>();
 		}
 
-		public void Awake(Vector3 position, Quaternion rotation) 
+		public void Awake(Vector3 position)
+		{
+			gameObject.SetActive(true);
+			transform.position = position;
+			transform.rotation = Quaternion.identity;
+			poolObjectScript.OnAwake();
+		}
+
+		public void Awake(Vector3 position, Vector3 rotation) 
 		{
 			gameObject.SetActive (true);
 			transform.position = position;
-			transform.rotation = rotation;
+			transform.eulerAngles = rotation;
 			poolObjectScript.OnAwake ();
 		}
 

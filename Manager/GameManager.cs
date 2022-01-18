@@ -1,18 +1,22 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
+using Sangki;
+using Sangki.Player;
 
 public class GameManager : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    public static GameManager Instance;
+    public event UnityAction<int> OnInitialize;
+    public UIManager UIManager;
+
+    private void Awake()
     {
-        
+        if (GameManager.Instance != null) Destroy(this);
+        else Instance = this;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void Start()
     {
-        
+        if (OnInitialize != null) OnInitialize(PlayerController.Instance.maxHealth);
     }
 }

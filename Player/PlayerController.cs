@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.Events;
 using MoreMountains.Feedbacks;
 
 namespace Sangki.Player
@@ -7,6 +9,10 @@ namespace Sangki.Player
     {
         #region VARIABLE
         public static PlayerController Instance;
+
+        public event UnityAction<int> OnDamagedReceived;
+        public event UnityAction<int> OnPlayerAttack;
+        public event UnityAction OnPlayerDied;
 
         [Header("COMPONENTS")]
         public AttackColliderSwitch attackColliderSwitch;
@@ -20,9 +26,10 @@ namespace Sangki.Player
         private Transform shieldParent;
 
         [Header("STATS")]
-        public int attackPower;
         [SerializeField]
-        private int maxHealth;
+        private bool noHit;
+        public int attackPower;
+        public int maxHealth;
         [SerializeField]
         private int currentHealth;
         [SerializeField]
@@ -37,6 +44,8 @@ namespace Sangki.Player
         private float chargeTime = 2f;
         [SerializeField]
         private float parryingTime = 0.6f;
+        [SerializeField]
+        private float stepSize = 0.5f;
 
         [Header("ELSE")]
         [SerializeField]
@@ -312,6 +321,8 @@ namespace Sangki.Player
                                 isAttack = true;
                                 anim.SetTrigger(_Anim_Para_SwordAttack);
                             }
+
+                            OnPlayerAttack?.Invoke(0);
                         }
                     }
 
@@ -347,11 +358,14 @@ namespace Sangki.Player
 
             // Collider On
             attackColliderSwitch.DoAttack();
+
+            // Step
+            _rigidbody.MovePosition(thisTransform.position + thisTransform.forward * stepSize);
         }
 
         public void OnDamageTrigger(GameObject triggerObejct, int damageAmount)
         {
-            if (!isDead && !isDamaged && !isParrying && !isAttackedShield)
+            if (!isDead && !isDamaged && !isParrying && !isAttackedShield && !noHit)
             {
                 if (triggerObejct.CompareTag(_Tag_DamageMelee) || triggerObejct.CompareTag(_Tag_DamageObject))
                 {
@@ -360,19 +374,20 @@ namespace Sangki.Player
                         if (!isAttack)
                         {
                             // 적의 방향 각도에 따른 쉴드 처리
-                            if (Vector3.Dot(thisTransform.forward, Vector3.Normalize(triggerObejct.transform.position - thisTransform.position)) > 0)
+                            var enemyAngle = Vector3.Dot(thisTransform.forward, Vector3.Normalize(triggerObejct.transform.position - thisTransform.position));
+                            if (enemyAngle > 0)
                             {
                                 if (triggerObejct.CompareTag(_Tag_DamageMelee))
                                 {
                                     // 패링 작동
-                                    if (parryingTimer < parryingTime)
+                                    if (parryingTimer < parryingTime && shieldLayerWeight < 0.5f)
                                     {
                                         shieldLayerWeight = 0;
                                         anim.SetLayerWeight(1, 0);
                                         anim.SetTrigger(_Anim_Para_Parrying);
                                         feedback_Parrying.PlayFeedbacks();
                                         // FX
-                                        PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position, Quaternion.identity);
+                                        PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position);
 
                                         isOnShield = false;
                                         isAttack = true;
@@ -393,28 +408,45 @@ namespace Sangki.Player
                     isCharged = false;
                     isAttack = false;
                     attackColliderSwitch.isCancel = true;
-                    ShieldBlock(false);
+                    shieldLayerWeight = 0;
+                    anim.SetLayerWeight(1, 0);
                     feedback_Attack.StopFeedbacks();
+                    RotateToDamage(triggerObejct.transform);
+                    _rigidbody.AddRelativeForce(Vector3.forward * -5, ForceMode.Impulse);
 
                     currentHealth -= damageAmount;
+
+                    // Event
+                    if (OnDamagedReceived != null)
+                        OnDamagedReceived(currentHealth);
+
                     // Damaged
                     if (currentHealth > 0)
                     {
                         feedback_Knockback.PlayFeedbacks();
                     }
-                    // Death
+                    // Died
                     else
                     {
                         isDead = true;
                         isAttack = false;
                         isParrying = false;
                         isOnContol = false;
-                        shieldLayerWeight = 0;
-                        anim.SetLayerWeight(1, 0);
                         feedback_Death.PlayFeedbacks();
                     }
                 }
             }
+        }
+        #endregion
+
+        #region UTILITY
+        private void RotateToDamage(Transform target)
+        {
+            //thisTransform.rotation = Quaternion.LookRotation(Vector3.RotateTowards(transform.forward, target.position, 1, 0));
+            Vector3 dirToTarget = target.position - thisTransform.position;
+            dirToTarget = Quaternion.LookRotation(dirToTarget, Vector3.up).eulerAngles;
+            dirToTarget.x = 0; dirToTarget.z = 0;
+            thisTransform.rotation = Quaternion.Euler(dirToTarget);
         }
         #endregion
     }

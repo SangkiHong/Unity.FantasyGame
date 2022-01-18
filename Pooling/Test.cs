@@ -13,7 +13,7 @@ public class Test : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
 		if (Input.GetKeyDown(KeyCode.Space)) {
-			PoolManager.instance.GetObject("bullet", transform.position, transform.rotation);
+			PoolManager.instance.GetObject("bullet", transform.position);
 		}
 	}
 }

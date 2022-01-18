@@ -3,47 +3,50 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class EnemyHealthBar : PoolObject
+namespace Sangki
 {
-    [SerializeField]
-    private Slider slider;
-
-    private Transform thisTransform, targetTransform;
-    private float offsetY;
-    private bool isAssign;
-
-    private void Awake()
+    public class EnemyHealthBar : PoolObject
     {
-        thisTransform = this.transform;
-    }
+        [SerializeField]
+        private Slider slider;
 
-    private void FixedUpdate()
-    {
-        if (isAssign)
+        private Transform thisTransform, targetTransform;
+        private float offsetY;
+        private bool isAssign;
+
+        private void Awake()
         {
-            thisTransform.position = Vector3.Lerp(thisTransform.position, targetTransform.position + Vector3.up * offsetY, 0.3f);
+            thisTransform = this.transform;
         }
-    }
 
-    public void Assign(Transform target, int maxValue) 
-    {
-        isAssign = true;
-        targetTransform = target;
+        private void FixedUpdate()
+        {
+            if (isAssign)
+            {
+                thisTransform.position = Vector3.Lerp(thisTransform.position, targetTransform.position + Vector3.up * offsetY, 0.3f);
+            }
+        }
 
-        offsetY = targetTransform.GetComponent<Collider>().bounds.max.y - targetTransform.position.y;
-        slider.maxValue = maxValue;
-    }
+        public void Assign(Transform target, int maxValue)
+        {
+            isAssign = true;
+            targetTransform = target;
 
-    public void UpdateState(int currentPoint)
-    {
-        slider.value = currentPoint;
-    }
+            offsetY = targetTransform.GetComponent<Collider>().bounds.max.y - targetTransform.position.y;
+            slider.maxValue = maxValue;
+        }
 
-    public void Unssaign()
-    {
-        isAssign = false;
-        targetTransform = null;
+        public void UpdateState(int currentPoint)
+        {
+            slider.value = currentPoint;
+        }
 
-        Done(true);
+        public void Unssaign()
+        {
+            isAssign = false;
+            targetTransform = null;
+
+            Done(true);
+        }
     }
 }
