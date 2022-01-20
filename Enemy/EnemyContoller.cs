@@ -14,7 +14,7 @@ namespace Sangki.Enemy
 {
     [RequireComponent(typeof(NavMeshAgent))]
     [RequireComponent(typeof(Animator))]
-    public class EnemyContoller : MonoBehaviour
+    public class EnemyContoller : MonoBehaviour, IDamageable
     {
         #region VARIABLE
         #region ABILITY
@@ -192,8 +192,9 @@ namespace Sangki.Enemy
         private Collider thisCollider;
         private WaitForSeconds ws_State;
         private Rigidbody _rigidbody;
+        private Sequence shotArrowSequence;
         private NavMeshHit navHit;
-        private Vector3 randomDirection, arrowLineEndPos;
+        private Vector3 randomDirection;
 
         private readonly string _Tag_DamageMelee = "DamageMelee";
         private readonly string _Tag_DamageObject = "DamageObject";
@@ -202,7 +203,7 @@ namespace Sangki.Enemy
         private readonly string _String_Fireball = "Fireball";
 
         private float stateTime, blinkTimer, attackTimer, seekIdleTimer, skillTimer;
-        private float defaultSpeed, defaultStopDist, attackDist, targetWeight, layerChangeSpeed;
+        private float defaultSpeed, defaultStopDist, attackDist, targetDist, targetWeight, layerChangeSpeed;
         private int currentHealth, targetLayer;
 
         private int m_AnimPara_isMove,
@@ -387,6 +388,7 @@ namespace Sangki.Enemy
                             if (!anim.GetBool(m_AnimPara_isAttack))
                             {
                                 if (navAgent.isStopped) navAgent.isStopped = false;
+
                                 if (!navAgent.pathPending)
                                 {
                                     if (!isDamaged)
@@ -414,7 +416,7 @@ namespace Sangki.Enemy
                             if (!navAgent.isStopped) navAgent.isStopped = true;
 
                             // TARGET 과 거리 측정 후 STATE 재설정(공격 중이 아닐 때)
-                            float targetDist = Vector3.Distance(thisTransform.position, targetObject.transform.position);
+                            targetDist = Vector3.Distance(thisTransform.position, targetObject.transform.position);
                             if (targetDist > attackDist)
                             {
                                 anim.SetBool(m_AnimPara_isMove, true);
@@ -511,9 +513,7 @@ namespace Sangki.Enemy
                 if (isOnShotLine)
                 {
                     shotLineRenderer.SetPosition(0, arrowLineStartPos.position);
-                    arrowLineEndPos = targetObject.transform.position;
-                    arrowLineEndPos.y = arrowLineStartPos.position.y;
-                    shotLineRenderer.SetPosition(1, arrowLineEndPos);
+                    shotLineRenderer.SetPosition(1, arrowLineStartPos.position + arrowLineStartPos.forward * 20);
                 }
             }
             else
@@ -544,7 +544,7 @@ namespace Sangki.Enemy
                 }
             }
 
-            if (!isDead && !isDodge)
+            if (enemyState == EnemyState.Chase && !isDead && !isDodge)
             {
                 if (navAgent.isOnOffMeshLink && !isNavMeshLink)
                 {
@@ -585,50 +585,56 @@ namespace Sangki.Enemy
                 {
                     if (other.gameObject.layer == 9) // Player Attack
                     {
-                        currentHealth -= PlayerController.Instance.attackPower;
+                        Damage(PlayerController.Instance.attackPower);
                     }
-                    else if (other.gameObject.layer == 10) // Object Damage
+                    else // Object Damage
                     {
-                        currentHealth -= 1;
+                        Damage(1);
                     }
-
-                    navAgent.isStopped = true;
-                    isDamaged = true;
-                    attackColliderSwitch.isCancel = true;
-                    feedback_Attack?.StopFeedbacks();
-
-                    if (currentHealth > 0)
-                    {
-                        feedback_Knockback.StopFeedbacks();
-                        feedback_Knockback.PlayFeedbacks();
-
-                        if (enemyState != EnemyState.Attack)
-                        {
-                            anim.SetBool(m_AnimPara_isFight, true);
-                            targetObject = PlayerController.Instance.gameObject;
-                            navAgent.speed = defaultSpeed;
-                            navAgent.stoppingDistance = defaultStopDist;
-                            enemyState = EnemyState.Attack;
-                        }
-                        StickEnemyUI(true, true);
-                    }
-                    else
-                    {
-                        isDead = true;
-                        enemyState = EnemyState.Dead;
-                        anim.SetTrigger(m_AnimPara_Dead);
-                        feedback_Dead?.PlayFeedbacks();
-                        thisCollider.enabled = false;
-                        if (enemyHealthBar)
-                        {
-                            enemyHealthBar.Unassign();
-                            enemyHealthBar = null;
-                        }
-                    }
-
-                    if (enemyHealthBar) enemyHealthBar.UpdateState(currentHealth);
                 }
             }
+        }
+
+        public void Damage(int damageAmount)
+        {
+            currentHealth -= damageAmount;
+            isDamaged = true;
+            navAgent.isStopped = true;
+            attackColliderSwitch.isCancel = true;
+            feedback_Attack?.StopFeedbacks();
+
+            CancelAttack();
+            
+            if (currentHealth > 0)
+            {
+                feedback_Knockback.StopFeedbacks();
+                feedback_Knockback.PlayFeedbacks();
+
+                if (enemyState != EnemyState.Attack)
+                {
+                    anim.SetBool(m_AnimPara_isFight, true);
+                    targetObject = PlayerController.Instance.gameObject;
+                    navAgent.speed = defaultSpeed;
+                    navAgent.stoppingDistance = defaultStopDist;
+                    enemyState = EnemyState.Attack;
+                }
+                StickEnemyUI(true, true);
+            }
+            else
+            {
+                isDead = true;
+                enemyState = EnemyState.Dead;
+                anim.SetTrigger(m_AnimPara_Dead);
+                feedback_Dead?.PlayFeedbacks();
+                thisCollider.enabled = false;
+                if (enemyHealthBar)
+                {
+                    enemyHealthBar.Unassign();
+                    enemyHealthBar = null;
+                }
+            }
+
+            if (enemyHealthBar) enemyHealthBar.UpdateState(currentHealth);
         }
         #endregion
 
@@ -648,29 +654,39 @@ namespace Sangki.Enemy
                 anim.SetTrigger(m_AnimPara_Aimming);
                 shotLineRenderer.gameObject.SetActive(true);
                 isOnShotLine = true;
-                Sequence shotArrow = DOTween.Sequence();
-                shotArrow
-                    .AppendInterval(2f)
-                    .AppendCallback(() => 
-                    {
-                        if (!isDamaged)
-                        {
-                            shotLineRenderer.SetPosition(1, arrowLineStartPos.position);
-                            shotLineRenderer.gameObject.SetActive(false);
-                            isOnShotLine = false;
-                            anim.SetTrigger(m_AnimPara_ShotArrow);
+
+                if (shotArrowSequence == null)
+                {
+                    shotArrowSequence = DOTween.Sequence()
+                      .AppendInterval(2f)
+                      .AppendCallback(() =>
+                      {
+                          if (!isDamaged)
+                          {
+                              shotLineRenderer.SetPosition(1, arrowLineStartPos.position);
+                              shotLineRenderer.gameObject.SetActive(false);
+                              isOnShotLine = false;
+                              anim.SetTrigger(m_AnimPara_ShotArrow);
 
                             // Arrow
                             PoolManager.instance.GetObject(_String_Arrow, arrowLineStartPos.position, arrowLineStartPos.eulerAngles);
 
-                        }
-                    })
-                    .AppendInterval(0.4f)
-                    .AppendCallback(()=>
-                    {
-                        ChangeLayerWeight(1, 0, 2f);
-                        anim.SetBool(m_AnimPara_isAttack, false);
-                    });
+                          }
+                      })
+                      .AppendInterval(0.4f)
+                      .AppendCallback(() =>
+                      {
+                          ChangeLayerWeight(1, 0, 2f);
+                          anim.SetBool(m_AnimPara_isAttack, false);
+                      })
+                      .SetRecyclable().SetAutoKill(false); // Tween Reuse
+                    shotArrowSequence.Play();
+                }
+                else
+                {
+                    shotArrowSequence.Restart(); // Tween Reuse
+                }
+                
             }
             // SPELL
             if (type == 2)
@@ -700,24 +716,40 @@ namespace Sangki.Enemy
             if (isBoss)enemyBoss.BossSkill();
         }
 
-        public void DodgeAttack(int dodge = 0)
+        public void DodgeAttack()
         {
-            if (dodge == 0)
+            if (!isDodge && enemyState == EnemyState.Attack && targetDist <= navAgent.stoppingDistance + 0.1f)
             {
-                if (enemyState == EnemyState.Attack && UnityEngine.Random.value < dodgeChance)
+                if (UnityEngine.Random.value < dodgeChance)
                 {
+                    // Cancel Archer aiming
+                    if (enemyClass == EnemyClass.Archer)
+                    {
+                        CancelAttack();
+                    }
+
                     // NavMesh의 길이 있는지 파악 후 위치로 닷지
-                    if (NavMesh.SamplePosition(GetDodgePoint(dodgeAngle), out navHit, seekDistance, NavMesh.AllAreas))
+                    if (NavMesh.SamplePosition(GetDodgePoint(dodgeAngle), out navHit, dodgeChance, NavMesh.AllAreas))
                     {
                         isDodge = true;
                         navAgent.isStopped = true;
+                        anim.SetBool(m_AnimPara_isAttack, false);
                         thisTransform.DOMove(navHit.position, 1f)
                             .SetEase(Ease.OutCubic)
-                            .OnComplete(() => 
+                            .OnComplete(() =>
                             {
+                                isDodge = false;
+                                navAgent.Warp(thisTransform.position);
+                                navAgent.isStopped = false;
+
                                 // 닷지 후 반격
-                                if (UnityEngine.Random.value < counterattackChance)
+                                if (enemyClass == EnemyClass.Normal && UnityEngine.Random.value < counterattackChance)
                                 {
+                                    navAgent.isStopped = false;
+                                    navAgent.Warp(thisTransform.position);
+                                    navAgent.SetDestination(targetObject.transform.position);
+
+                                    anim.SetBool(m_AnimPara_isAttack, true);
                                     anim.SetTrigger(m_AnimPara_Counterattack);
                                 }
                             });
@@ -725,13 +757,24 @@ namespace Sangki.Enemy
                     }
                 }
             }
-            else
+        }
+
+        private void CancelAttack()
+        {
+            if (anim.GetBool(m_AnimPara_isAttack))
             {
-                if (isDodge)
+                anim.SetBool(m_AnimPara_isAttack, false);
+
+                if (isChangeLayerWeight)
                 {
-                    isDodge = false;
-                    navAgent.Warp(thisTransform.position);
-                    navAgent.isStopped = false;
+                    isChangeLayerWeight = false;
+                    anim.SetLayerWeight(1, 0);
+                }
+                if (shotArrowSequence != null)
+                {
+                    shotArrowSequence.Pause();
+                    shotLineRenderer.gameObject.SetActive(false);
+                    isOnShotLine = false;
                 }
             }
         }

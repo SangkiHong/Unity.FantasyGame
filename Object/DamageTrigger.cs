@@ -13,8 +13,13 @@ namespace Sangki.Object
 
         private void Awake()
         {
-            thisGameobejct = gameObject;
-            thisCollider = this.GetComponent<Collider>();
+            if (!thisGameobejct) thisGameobejct = gameObject;
+            if (!thisCollider) thisCollider = this.GetComponent<Collider>();
+        }
+
+        private void OnEnable()
+        {
+            thisCollider.enabled = true;
         }
 
         private void OnTriggerEnter(Collider other)

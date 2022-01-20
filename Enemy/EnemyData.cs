@@ -1,5 +1,4 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "Enemy Data", menuName = "Scriptable Ojbect/Enemy Data", order = int.MaxValue)]

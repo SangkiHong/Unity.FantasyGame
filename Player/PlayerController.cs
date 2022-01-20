@@ -11,7 +11,7 @@ namespace Sangki.Player
         public static PlayerController Instance;
 
         public event UnityAction<int> OnDamagedReceived;
-        public event UnityAction<int> OnPlayerAttack;
+        public event UnityAction OnPlayerAttack;
         public event UnityAction OnPlayerDied;
 
         [Header("COMPONENTS")]
@@ -322,7 +322,7 @@ namespace Sangki.Player
                                 anim.SetTrigger(_Anim_Para_SwordAttack);
                             }
 
-                            OnPlayerAttack?.Invoke(0);
+                            OnPlayerAttack?.Invoke();
                         }
                     }
 
