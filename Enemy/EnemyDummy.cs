@@ -76,7 +76,7 @@ public class EnemyDummy : MonoBehaviour
     private GameObject targetObject;
     private Transform thisTransform;
     private Collider thisCollider;
-    private EnemyHealthBar enemyHealthBar;
+    private EnemyStatsUI enemyHealthBar;
     private WaitForSeconds ws_State;
     private WaitForSeconds ws;
     private NavMeshHit navHit;
@@ -134,7 +134,7 @@ public class EnemyDummy : MonoBehaviour
 
         if (enemyHealthBar)
         {
-            enemyHealthBar.Unssaign();
+            enemyHealthBar.Unassign();
             enemyHealthBar = null;
         }
 
@@ -282,7 +282,7 @@ public class EnemyDummy : MonoBehaviour
                     {
                         isHealthBarAttached = true;
 
-                        enemyHealthBar = UIPoolManager.instance.GetObject(m_String_EnemyHP, transform.position).GetComponent<EnemyHealthBar>();
+                        enemyHealthBar = UIPoolManager.instance.GetObject(m_String_EnemyHP, transform.position).GetComponent<EnemyStatsUI>();
                         enemyHealthBar.Assign(transform, healthPoint);
                     }
                 }
@@ -298,7 +298,7 @@ public class EnemyDummy : MonoBehaviour
                     if (isHealthBarAttached)
                     {
                         isHealthBarAttached = false;
-                        enemyHealthBar.Unssaign();
+                        enemyHealthBar.Unassign();
                         enemyHealthBar = null;
                     }
                 }
