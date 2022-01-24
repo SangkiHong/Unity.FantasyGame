@@ -103,9 +103,6 @@ namespace Sangki.Enemy
         [SerializeField]
         private bool debugRader;
         [FoldoutGroup("SEEK AND WONDER")]
-        [SerializeField]
-        private string targetTag = "Player";
-        [FoldoutGroup("SEEK AND WONDER")]
         public LayerMask objectLayerMask;
         [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
@@ -216,7 +213,7 @@ namespace Sangki.Enemy
                     m_AnimPara_Jump,
                     m_AnimPara_Aimming,
                     m_AnimPara_ShotArrow,
-                    m_AnimPara_Spell,
+                    m_AnimPara_CastSkill,
                     m_AnimPara_Dodge,
                     m_AnimPara_Counterattack;
         private bool isDead, 
@@ -247,29 +244,32 @@ namespace Sangki.Enemy
             {
                 if (enemyClass == EnemyClass.Normal)
                 {
-                    equipments[0].SetActive(true);
+                    equipments[0].SetActive(true); // 클래스 별 무기 장착 : 일반 검
 
                 }
                 else if (enemyClass == EnemyClass.Archer)
                 {
-                    equipments[1].SetActive(true);
-                    anim.runtimeAnimatorController = archerAC;
+                    equipments[1].SetActive(true); // 클래스 별 무기 장착 : 활
+                    anim.runtimeAnimatorController = archerAC; // 클래스 별 Animator : Archer
 
                     m_AnimPara_Aimming = anim.GetParameter(11).nameHash;
                     m_AnimPara_ShotArrow = anim.GetParameter(12).nameHash;
                 }
                 else if (enemyClass == EnemyClass.Wizard)
                 {
-                    equipments[2].SetActive(true);
-                    anim.runtimeAnimatorController = wizardAC;
-                    m_AnimPara_Spell = anim.GetParameter(11).nameHash;
+                    equipments[2].SetActive(true); // 클래스 별 무기 장착 : 지팡이
+                    anim.runtimeAnimatorController = wizardAC; // 클래스 별 Animator : Wizard
+                    m_AnimPara_CastSkill = anim.GetParameter(11).nameHash;
                 }
-            }
-            if (isBoss)
-            {
-                if (enemyBoss.boss == EnemyBoss.BossName.BudKing) m_AnimPara_Spell = anim.GetParameter(9).nameHash;
+                m_AnimPara_Counterattack = anim.GetParameter(10).nameHash;
             }
 
+            if (isBoss)
+            {
+                if (enemyBoss.boss == EnemyBoss.BossName.BudKing) m_AnimPara_CastSkill = anim.GetParameter(10).nameHash;
+            }
+
+            // Common Animation Parameters
             m_AnimPara_MoveBlend = anim.GetParameter(0).nameHash;
             m_AnimPara_Attack = anim.GetParameter(1).nameHash;
             m_AnimPara_isMove = anim.GetParameter(3).nameHash;
@@ -279,7 +279,6 @@ namespace Sangki.Enemy
             m_AnimPara_Jump = anim.GetParameter(7).nameHash;
             m_AnimPara_MeleeSpeed = anim.GetParameter(8).nameHash;
             m_AnimPara_Dodge = anim.GetParameter(9).nameHash;
-            m_AnimPara_Counterattack = anim.GetParameter(10).nameHash;
 
             for (int i = 0; i < damageAbilities.Length; i++)
             {
@@ -298,7 +297,7 @@ namespace Sangki.Enemy
             isDead = false;
             isDamaged = false;
             blinkTimer = 0;
-            attackTimer = attackCooldown * 0.7f;
+            attackTimer = attackCooldown * 0.3f;
             seekIdleTimer = 0;
             skillTimer = 0;
             enemyState = EnemyState.Seek;
@@ -388,7 +387,6 @@ namespace Sangki.Enemy
                             if (!anim.GetBool(m_AnimPara_isAttack))
                             {
                                 if (navAgent.isStopped) navAgent.isStopped = false;
-
                                 if (!navAgent.pathPending)
                                 {
                                     if (!isDamaged)
@@ -427,16 +425,16 @@ namespace Sangki.Enemy
                             if (anim.GetBool(m_AnimPara_isMove)) anim.SetBool(m_AnimPara_isMove, false);
 
                             // Attack Cooldown
-                            if (attackCooldown > attackTimer)
+                            if (0 < attackTimer)
                             {
-                                if (!isDamaged && !isCastingSkill) attackTimer += stateTime;
+                                if (!isDamaged && !isCastingSkill) attackTimer -= stateTime;
                             }
                             // Do Attack
                             else
                             {
                                 if (!isDamaged)
                                 {
-                                    attackTimer = 0;
+                                    attackTimer = attackCooldown;
 
                                     if (enemyType == EnemyType.Human)
                                     {
@@ -495,7 +493,7 @@ namespace Sangki.Enemy
                         else
                         {
                             StopDuringCastingSkill();
-                            anim.SetTrigger(m_AnimPara_Spell);
+                            anim.SetTrigger(m_AnimPara_CastSkill);
                         }
                     }
                 }
@@ -691,18 +689,21 @@ namespace Sangki.Enemy
             // SPELL
             if (type == 2)
             {
-                anim.SetTrigger(m_AnimPara_Spell);
+                anim.SetTrigger(m_AnimPara_CastSkill);
             }
         }
 
         public void MeleeAttack()
         {
-            // Feedback
-            feedback_Attack?.PlayFeedbacks();
-            // Collider On
-            attackColliderSwitch?.DoAttack();
-            // Step
-            navAgent.Move(thisTransform.forward * attackStepsize);
+            if (!isDodge && !isDamaged && !isDead)
+            {
+                // Feedback
+                feedback_Attack?.PlayFeedbacks();
+                // Collider On
+                attackColliderSwitch?.DoAttack();
+                // Step
+                navAgent.Move(thisTransform.forward * attackStepsize);
+            }
         }
 
         public void SpellAttack()
@@ -764,6 +765,7 @@ namespace Sangki.Enemy
             if (anim.GetBool(m_AnimPara_isAttack))
             {
                 anim.SetBool(m_AnimPara_isAttack, false);
+                attackTimer = 0; // 긴박감을 주기 위해 어택 취소 시 바로 어택 가능
 
                 if (isChangeLayerWeight)
                 {
@@ -803,7 +805,7 @@ namespace Sangki.Enemy
         // TARGET SEARCH RADER
         private void Rader()
         {
-            if (targetObject = MovementUtility.WithinSight(thisTransform, offset, fieldOfViewAngle, viewDistance, GameObject.FindGameObjectWithTag(targetTag), targetOffset, ignoreLayerMask, useTargetBone, targetBone))
+            if (targetObject = MovementUtility.WithinSight(thisTransform, offset, fieldOfViewAngle, viewDistance, PlayerController.Instance.gameObject, targetOffset, ignoreLayerMask, useTargetBone, targetBone))
             {
                 navAgent.speed = defaultSpeed;
                 navAgent.stoppingDistance = defaultStopDist;

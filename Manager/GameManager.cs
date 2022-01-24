@@ -1,22 +1,24 @@
 using UnityEngine;
 using UnityEngine.Events;
-using Sangki;
 using Sangki.Player;
 
-public class GameManager : MonoBehaviour
+namespace Sangki.Manager
 {
-    public static GameManager Instance;
-    public event UnityAction<int> OnInitialize;
-    public UIManager UIManager;
-
-    private void Awake()
+    public class GameManager : MonoBehaviour
     {
-        if (GameManager.Instance != null) Destroy(this);
-        else Instance = this;
-    }
+        public static GameManager Instance;
+        public event UnityAction<int> OnInitialize;
+        public UIManager UIManager;
 
-    private void Start()
-    {
-        if (OnInitialize != null) OnInitialize(PlayerController.Instance.maxHealth);
+        private void Awake()
+        {
+            if (GameManager.Instance != null) Destroy(this);
+            else Instance = this;
+        }
+
+        private void Start()
+        {
+            if (OnInitialize != null) OnInitialize(PlayerController.Instance.maxHealth);
+        }
     }
 }

@@ -2,12 +2,14 @@
 using UnityEngine.UI;
 using Sangki.Player;
 
-namespace Sangki
+namespace Sangki.Manager
 {
     public class UIManager : MonoBehaviour
     {
         [SerializeField]
         private Slider healthSlider;
+        [SerializeField]
+        private GameObject interactButton;
 
         private void OnEnable()
         {
@@ -26,6 +28,9 @@ namespace Sangki
         {
             healthSlider.value = health;
         }
+
+        public void OnInteractButton(bool isOn) => interactButton.SetActive(isOn);
+        
 
         private void OnDestroy()
         {
