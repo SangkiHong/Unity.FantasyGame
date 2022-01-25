@@ -8,8 +8,8 @@ namespace Sangki.Object
 {
     public class InteractableObjects : MonoBehaviour, IInteractable
     {
+        #region VARIABLE
         private enum InteractType { Lever, Button, Hit }
-
 
         #region COMPONENTS
         [FoldoutGroup("COMPONENTS")]
@@ -29,9 +29,6 @@ namespace Sangki.Object
         [ShowIf("interactType", InteractType.Button)]
         [SerializeField]
         private bool justTouchSwitch;
-        [FoldoutGroup("SWITCH")]
-        [SerializeField]
-        private bool isOneWay;
         [FoldoutGroup("SWITCH")]
         [SerializeField]
         private Transform switchTrans;
@@ -70,55 +67,20 @@ namespace Sangki.Object
         private Ease switchRotateEase;
         #endregion
 
-        #region TARGET
-        [FoldoutGroup("TARGET")]
         [SerializeField]
-        private GameObject interactee;
-        [Header("MOVE OBJECT")]
-        [FoldoutGroup("TARGET")]
-        [SerializeField]
-        private bool withMove;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withMove")]
-        [SerializeField]
-        private Vector3 toMovePos;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withMove")]
-        [SerializeField]
-        private float toMoveDuration;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withMove")]
-        [SerializeField]
-        private float toMoveDelay;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withMove")]
-        [SerializeField]
-        private Ease toMoveEase;
-
-        [Header("ROTATE OBJECT")]
-        [FoldoutGroup("TARGET")]
-        [SerializeField]
-        private bool withRotate;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withRotate")]
-        [SerializeField]
-        private Vector3 toRotate;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withRotate")]
-        [SerializeField]
-        private float toRotateDuration;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withRotate")]
-        [SerializeField]
-        private float toRotateDelay;
-        [FoldoutGroup("TARGET")]
-        [ShowIf("withRotate")]
-        [SerializeField]
-        private Ease toRotateEase;
-        #endregion
+        private InteractableListner interactableListner;
 
         readonly string m_Tag_Player = "Player";
-        bool isInteracting, isInteracted, isSwitchAvailable, isClose;
+        bool isSwitchAvailable, isClose, isInteracted;
+        #endregion
+
+        private void OnEnable()
+        {
+            if (interactableListner) 
+            {
+                interactableListner.OnIneractionCompleted += OnInteractionCompleted;
+            }
+        }
 
         private void SwitchAvailable(bool isAvailable)
         {
@@ -141,28 +103,17 @@ namespace Sangki.Object
         public void Interact() 
         {
             // 작동 중에 사용 금지
-            if (!isInteracting)
+            if (!interactableListner.isInteracting && isClose)
             {
-                if (isOneWay && isInteracted) return; // 한번만 작동 가능
+                if (interactableListner.isOneWay && isInteracted) return; // 한번만 작동 가능
 
-                isInteracting = true;
+                isInteracted = !isInteracted;
 
                 // 작동
                 if (!isInteracted)
                 {
                     // 타겟 움직임 & 회전
-                    if (withMove) interactee.transform.DOMove(toMovePos, toMoveDuration).SetRelative(true).SetEase(toMoveEase).SetDelay(toMoveDelay)
-                            .OnComplete(() => 
-                            {
-                                isInteracting = false; 
-                                if (!isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true);
-                            });
-                    if (withRotate) interactee.transform.DORotate(toRotate, toRotateDuration).SetRelative(true).SetEase(toRotateEase).SetDelay(toRotateDelay)
-                            .OnComplete(() => 
-                            {
-                                isInteracting = false; 
-                                if (!isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true);
-                            });
+                    interactableListner.Interact();
 
                     // 스위치 움직임 & 회전
                     if (switchMove) switchTrans.DOMove(switchToMove, switchMoveDuration).SetRelative(true).SetEase(switchMoveEase);
@@ -172,19 +123,7 @@ namespace Sangki.Object
                 else
                 {
                     // 타겟 움직임 & 회전
-                    if (withMove) interactee.transform.DOMove(-toMovePos, toMoveDuration).SetRelative(true).SetEase(toMoveEase).SetDelay(toMoveDelay)
-                            .OnComplete(() => 
-                            {
-                                isInteracting = false; 
-                                if (!isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true); 
-                            });
-                    if (withRotate) interactee.transform.DORotate(-toRotate, toRotateDuration).SetRelative(true).SetEase(toRotateEase).SetDelay(toRotateDelay)
-                            .OnComplete(() => 
-                            {
-                                isInteracting = false; 
-                                
-                                if (!isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true); 
-                            });
+                    interactableListner.Interact();
 
                     // 스위치 움직임 & 회전
                     if (switchMove) switchTrans.DOMove(-switchToMove, switchMoveDuration).SetRelative(true).SetEase(switchMoveEase);
@@ -195,14 +134,13 @@ namespace Sangki.Object
                 feedbacks_Interacting?.PlayFeedbacks();
 
                 SwitchAvailable(false);
-                isInteracted = !isInteracted;
             }
         }
 
         #region TRIGGER
         private void OnTriggerEnter(Collider other)
         {
-            if (isOneWay && isInteracted || Player.PlayerController.Instance.isDead) return;
+            if (interactableListner.isOneWay && isInteracted || Player.PlayerController.Instance.isDead) return;
 
             if (other.CompareTag(m_Tag_Player)) 
             {
@@ -229,8 +167,23 @@ namespace Sangki.Object
                 }
                 else
                 {
-                    if (!isOneWay && isInteracted && !Player.PlayerController.Instance.isDead) Interact();
+                    if (!interactableListner.isOneWay && isInteracted && !Player.PlayerController.Instance.isDead) Interact();
                 }
+            }
+        }
+        #endregion
+
+        #region EVENT
+        private void OnInteractionCompleted()
+        {
+            if (!interactableListner.isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true);
+        }
+
+        private void OnDisable()
+        {
+            if (interactableListner)
+            {
+                interactableListner.OnIneractionCompleted -= OnInteractionCompleted;
             }
         }
         #endregion

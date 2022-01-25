@@ -480,11 +480,11 @@ namespace Sangki.Player
                                 feedback_ShieldDefense.PlayFeedbacks();
                                 return;
                             }
-
-                            RotateToDamage(triggerObejct.transform);
-                            Damage(damageAmount);
                         }
                     }
+
+                    RotateToDamage(triggerObejct.transform);
+                    Damage(damageAmount);
                 }
             }
         }
@@ -546,9 +546,9 @@ namespace Sangki.Player
             // 약간 신체에 박혀 있는 위치로부터 발사하지 않으면 제대로 판정할 수 없을 때가 있다.
             var maxDistance = 0.2f;
 
-            var ray1 = new Ray(thisTransform.position - (thisTransform.forward * 0.5f), Vector3.down * maxDistance);
+            var ray1 = new Ray(thisTransform.position - (thisTransform.forward * 0.3f), Vector3.down * maxDistance);
 
-            Debug.DrawRay(thisTransform.position - (thisTransform.forward * 0.5f), Vector3.down * maxDistance, Color.green);
+            Debug.DrawRay(thisTransform.position - (thisTransform.forward * 0.3f), Vector3.down * maxDistance, Color.green);
 
             return Physics.Raycast(ray1, maxDistance, _fieldLayer);
         }

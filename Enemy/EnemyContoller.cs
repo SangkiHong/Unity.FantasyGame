@@ -89,6 +89,13 @@ namespace Sangki.Enemy
         #endregion
         #endregion
 
+        #region INTERACTION
+        [Header("INTERACTION")]
+        [FoldoutGroup("INTERACTION")]
+        [SerializeField]
+        private InteractableListner interactableListner;
+        #endregion
+
         #region SEEK AND WONDER
         [Header("SEEK AND WONDER")]
         [FoldoutGroup("SEEK AND WONDER")]
@@ -603,6 +610,7 @@ namespace Sangki.Enemy
 
             CancelAttack();
             
+            // DAMAGE
             if (currentHealth > 0)
             {
                 feedback_Knockback.StopFeedbacks();
@@ -618,12 +626,15 @@ namespace Sangki.Enemy
                 }
                 StickEnemyUI(true, true);
             }
+            // DIED
             else
             {
                 isDead = true;
                 enemyState = EnemyState.Dead;
                 anim.SetTrigger(m_AnimPara_Dead);
                 feedback_Dead?.PlayFeedbacks();
+                interactableListner?.Interact();
+
                 thisCollider.enabled = false;
                 if (enemyHealthBar)
                 {
