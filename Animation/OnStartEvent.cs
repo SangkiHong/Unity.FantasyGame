@@ -1,4 +1,5 @@
 using UnityEngine;
+using Sirenix.OdinInspector;
 
 public class OnStartEvent : StateMachineBehaviour
 {
@@ -7,9 +8,11 @@ public class OnStartEvent : StateMachineBehaviour
     [SerializeField]
     private EventType eventType;
 
+    [ShowIf("eventType", EventType.ChangeState)]
     [SerializeField]
     private string targetBool;
 
+    [ShowIf("eventType", EventType.ChangeState)]
     [SerializeField]
     private bool switchOnStart;
 

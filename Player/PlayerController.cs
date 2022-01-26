@@ -43,6 +43,8 @@ namespace Sangki.Player
         [FoldoutGroup("STATS")]
         public int attackPower;
         [FoldoutGroup("STATS")]
+        public float attackComboInterval = 0.6f;
+        [FoldoutGroup("STATS")]
         public int maxHealth;
         [FoldoutGroup("STATS")]
         [SerializeField]
@@ -127,16 +129,15 @@ namespace Sangki.Player
         [SerializeField]
         private bool isOnContol = true,
                      isJump,
+                     isAttack,
                      isFalling,
                      isOnGround,
                      isOnShield,
                      isDamaged,
-                     isAttack,
                      isAttackedShield,
                      isChargingStart,
                      isCharging,
-                     isCharged,
-                     isParrying;
+                     isCharged;
 
         private float fixedDeltaTime, 
                       shieldLayerWeight, 
@@ -144,21 +145,25 @@ namespace Sangki.Player
                       chargeTimer,
                       parryingTimer,
                       jumpIntervalTimer,
-                      fallingTimer;
+                      fallingTimer,
+                      attackComboTimer;
 
         private readonly string _Tag_DamageMelee = "DamageMelee"; 
         private readonly string _Tag_DamageObject = "DamageObject"; 
         private readonly string _ObjectPool_SwordImpactGold = "SwordImpactGold"; 
         private readonly string _Anim_Para_isMove = "isMove";
         private readonly string _Anim_Para_isAttack = "isAttack"; 
+        private readonly string _Anim_Para_isParrying = "isParrying"; 
         private readonly string _Anim_Para_isFall = "Falling"; 
+        private readonly string _Anim_Para_ComboReady = "ComboReady"; 
         private readonly string _Anim_Para_MoveBlend = "MoveBlend";
         private readonly string _Anim_Para_Jump = "Jump"; 
         private readonly string _Anim_Para_Land = "Land"; 
         private readonly string _Anim_Para_SwordAttack = "SwordAttack";
         private readonly string _Anim_Para_ChargingAttack = "ChargingAttack"; 
         private readonly string _Anim_Para_ChargingEnd = "ChargingEnd"; 
-        private readonly string _Anim_Para_Parrying = "Parrying";
+        private readonly string _Anim_Para_Parrying = "Parrying"; 
+        private readonly string _Anim_Para_AttackCombo = "AttackCombo";
         #endregion
         #endregion
 
@@ -179,7 +184,7 @@ namespace Sangki.Player
 
             if (!isDead && isOnContol)
             {
-                // 점프 판정 후 딜레이
+                // Delay after Falling
                 if (isOnGround)
                 {
                     if (isJump || isFalling)
@@ -194,7 +199,7 @@ namespace Sangki.Player
                     }
                     if (fallingTimer > 0) fallingTimer = 0;
                 }
-                // 낙하 판정
+                // Check falling
                 else
                 {
                     if (!isJump)
@@ -212,7 +217,7 @@ namespace Sangki.Player
                     }
                 }
 
-                // 움직임 관련
+                // Movement
                 if (_Movement.x != 0 || _Movement.z != 0)
                 {
                     // Animation
@@ -244,8 +249,8 @@ namespace Sangki.Player
 
                 if (Input.GetKey(KeyCode.Space)) Jump();
 
-                // 쉴드 모션
-                if (!anim.GetBool(_Anim_Para_isAttack) && !isParrying && !isDamaged)
+                // Shield Motion
+                if (!anim.GetBool(_Anim_Para_isAttack) && !anim.GetBool(_Anim_Para_isParrying) && !isDamaged)
                 {
                     if (isOnShield)
                     {
@@ -255,7 +260,7 @@ namespace Sangki.Player
                             anim.SetLayerWeight(1, shieldLayerWeight);
                         }
 
-                        // 패링 타이머
+                        // Parrying Timer
                         if (parryingTimer < parryingTime) parryingTimer += fixedDeltaTime;
                     }
                     else
@@ -268,10 +273,10 @@ namespace Sangki.Player
                     }
                 }
 
-                // 점프 간격 타이머
+                // Jump Interval Timer
                 if (jumpIntervalTimer > 0) jumpIntervalTimer -= fixedDeltaTime;
 
-                // 블링크
+                // Damage Blink
                 if (isDamaged)
                 {
                     blinkTimer += fixedDeltaTime;
@@ -283,8 +288,8 @@ namespace Sangki.Player
                     }
                 }
 
-                // 차징 공격 타이머
-                if (!isOnShield && isCharging && !isCharged && !anim.GetBool(_Anim_Para_isAttack))
+                // Charging Attack Timer
+                if (!isOnShield && isCharging && !isCharged && !isAttack)
                 {
                     if (chargeTime > chargeTimer)
                     {
@@ -304,6 +309,17 @@ namespace Sangki.Player
                         particle_ChargeComplete.Play();
                     }
                 }
+
+                // Combo Attack Timer
+                if (!isAttack && anim.GetBool(_Anim_Para_ComboReady))
+                {
+                    if (attackComboTimer < attackComboInterval)
+                        attackComboTimer += fixedDeltaTime;
+                    else // Initialize
+                    {
+                        InitializeAttack();
+                    }
+                }
             }
         }
         #endregion
@@ -311,7 +327,7 @@ namespace Sangki.Player
         #region CONTROLL
         public virtual void Move(Vector2 newMovement)
         {
-            if (isOnContol && !anim.GetBool(_Anim_Para_isAttack))
+            if (isOnContol && !isAttack)
             {
                 _Movement.x = newMovement.x;
                 _Movement.z = newMovement.y;
@@ -333,6 +349,9 @@ namespace Sangki.Player
 
                     // Feedback
                     feedback_Jump?.PlayFeedbacks();
+
+                    // Combo Initialized
+                    InitializeAttack();
 
                     // 쉴드 시 해제
                     if (isOnShield)
@@ -373,7 +392,7 @@ namespace Sangki.Player
         #region ATTACK & DAMAGE
         public void Attack(bool isPush)
         {
-            if (!isAttack)
+            if (!isAttack && !isDamaged)
             {
                 if (isPush)
                 {
@@ -382,12 +401,13 @@ namespace Sangki.Player
                 }
                 else
                 {
-                    isChargingStart = false;
+                    isAttack = true;
                     isCharging = false;
+                    isChargingStart = false;
 
                     if (isOnGround)
                     {
-                        if (!isOnShield && !isDamaged)
+                        if (!isOnShield)
                         {
                             // 360 degree Attack
                             if (isCharged)
@@ -399,7 +419,6 @@ namespace Sangki.Player
                             // Normal Attack
                             else
                             {
-                                isAttack = true;
                                 anim.SetTrigger(_Anim_Para_SwordAttack);
                             }
 
@@ -410,12 +429,6 @@ namespace Sangki.Player
                     chargeTimer = 0;
                 }
             }
-        }
-
-        public void AbleToComboAttack()
-        {
-            isAttack = false;
-            isParrying = false;
         }
 
         public void ShieldBlock(bool isBlock)
@@ -442,11 +455,33 @@ namespace Sangki.Player
 
             // Step
             _rigidbody.MovePosition(thisTransform.position + thisTransform.forward * stepSize);
+
+            // Combo
+            attackComboTimer = 0;
+            int combo = anim.GetInteger(_Anim_Para_AttackCombo);
+            anim.SetInteger(_Anim_Para_AttackCombo, ++combo);
+            if (combo >= 3) anim.SetInteger(_Anim_Para_AttackCombo, 0);
+            anim.SetBool(_Anim_Para_ComboReady, true);
+        }
+
+        public void OnAttackEnd() => isAttack = false;
+
+        private void InitializeAttack()
+        {
+            isCharged = false;
+            isChargingStart = false;
+            anim.ResetTrigger(_Anim_Para_ChargingAttack);
+            anim.ResetTrigger(_Anim_Para_SwordAttack);
+            anim.SetBool(_Anim_Para_ComboReady, false);
+            anim.SetInteger(_Anim_Para_AttackCombo, 0);
+
+            chargeTimer = 0;
+            attackComboTimer = 0;
         }
 
         public void OnDamageTrigger(GameObject triggerObejct, int damageAmount)
         {
-            if (!isDead && !isDamaged && !isParrying && !isAttackedShield && !noHit)
+            if (!isDead && !isDamaged && !anim.GetBool(_Anim_Para_isParrying) && !isAttackedShield && !noHit)
             {
                 if (triggerObejct.CompareTag(_Tag_DamageMelee) || triggerObejct.CompareTag(_Tag_DamageObject))
                 {
@@ -455,8 +490,9 @@ namespace Sangki.Player
                         if (!isAttack)
                         {
                             // 적의 방향 각도에 따른 쉴드 처리
-                            var enemyAngle = Vector3.Angle(-triggerObejct.transform.forward, thisTransform.forward);
-                            if (enemyAngle < 60)
+                            Vector3 targetDir = triggerObejct.transform.position - thisTransform.position;
+                            var enemyAngle = Vector3.Angle(targetDir, thisTransform.forward);
+                            if (enemyAngle < 90)
                             {
                                 if (triggerObejct.CompareTag(_Tag_DamageMelee))
                                 {
@@ -471,8 +507,6 @@ namespace Sangki.Player
                                         PoolManager.instance.GetObject(_ObjectPool_SwordImpactGold, shieldParent.position);
 
                                         isOnShield = false;
-                                        isAttack = true;
-                                        isParrying = true;
                                         return;
                                     }
                                 }
@@ -496,6 +530,7 @@ namespace Sangki.Player
             isCharging = false;
             isCharged = false;
             isAttack = false;
+            InitializeAttack();
             attackColliderSwitch.isCancel = true;
             shieldLayerWeight = 0;
             anim.SetLayerWeight(1, 0);
@@ -517,8 +552,6 @@ namespace Sangki.Player
             else
             {
                 isDead = true;
-                isAttack = false;
-                isParrying = false;
                 isOnContol = false;
                 feedback_Death.PlayFeedbacks();
             }
