@@ -24,9 +24,9 @@ namespace Sangki.Manager
             healthSlider.value = playerMaxHealth;
         }
 
-        public void UpdatePlayerHealth(int health)
+        public void UpdatePlayerHealth(int currentHealth)
         {
-            healthSlider.value = health;
+            healthSlider.value = currentHealth;
         }
 
         public void OnInteractButton(bool isOn) => interactButton.SetActive(isOn);

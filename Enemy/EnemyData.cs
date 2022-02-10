@@ -1,7 +1,7 @@
 
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "Enemy Data", menuName = "Scriptable Ojbect/Enemy Data", order = int.MaxValue)]
+[CreateAssetMenu(fileName = "EnemyData", menuName = "Game Data/Enemy Data")]
 public class EnemyData : ScriptableObject
 {
     [SerializeField]

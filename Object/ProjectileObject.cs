@@ -37,9 +37,9 @@ namespace Sangki.Object
 
 		public override void OnAwake()
 		{
-			if (!myRigidbody) myRigidbody = GetComponent<Rigidbody>();
+			if (!myRigidbody) TryGetComponent<Rigidbody>(out myRigidbody);
 			if (!thisTransform) thisTransform = this.transform;
-			if (!thisCollider) thisCollider = this.GetComponent<Collider>();
+			if (!thisCollider) TryGetComponent<Collider>(out thisCollider);
 
 			thisCollider.enabled = true;
 

@@ -1,6 +1,5 @@
 
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace Sangki
@@ -9,22 +8,17 @@ namespace Sangki
     {
         [SerializeField]
         private List<BoxCollider> weaponColliders;
-        [SerializeField] private float timing_duration;
+        [SerializeField] 
+        private float timing_duration;
 
         [HideInInspector]
         public bool isCancel;
 
         private ParticleSystem attackTrail;
-        private WaitForSeconds ws;
-
-        private void Awake()
-        {
-            ws = new WaitForSeconds(timing_duration);
-        }
+        private readonly string string_EndAttack = "EndAttack";
 
         private void Start()
         {
-
             if (weaponColliders.Count != 0)
             {
                 for (int i = 0; i < weaponColliders.Count; i++) 
@@ -41,18 +35,25 @@ namespace Sangki
         {
             if (weaponColliders.Count != 0)
             {
+                if (!isCancel)
+                {
+                    attackTrail?.gameObject.SetActive(true);
+                    if (!isCancel) for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = true;
+
+                    if (timing_duration > 0) Invoke(string_EndAttack, timing_duration);
+                }
                 isCancel = false;
-                StartCoroutine(StateLoop());
             }
         }
 
-        IEnumerator StateLoop()
+        public void EndAttack()
         {
-            attackTrail?.gameObject.SetActive(true);
-            if (!isCancel) for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = true;
-            yield return ws;
-            attackTrail?.gameObject.SetActive(false);
-            for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = false;
+            if (weaponColliders.Count != 0)
+            {
+                isCancel = false;
+                attackTrail?.gameObject.SetActive(false);
+                for (int i = 0; i < weaponColliders.Count; i++) weaponColliders[i].enabled = false;
+            }
         }
     }
 }

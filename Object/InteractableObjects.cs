@@ -3,6 +3,7 @@ using Sirenix.OdinInspector;
 using DG.Tweening;
 using EPOOutline;
 using MoreMountains.Feedbacks;
+using Sangki.Enemy;
 
 namespace Sangki.Object
 {
@@ -79,6 +80,14 @@ namespace Sangki.Object
             if (interactableListner) 
             {
                 interactableListner.OnIneractionCompleted += OnInteractionCompleted;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (interactableListner)
+            {
+                interactableListner.OnIneractionCompleted -= OnInteractionCompleted;
             }
         }
 
@@ -177,14 +186,6 @@ namespace Sangki.Object
         private void OnInteractionCompleted()
         {
             if (!interactableListner.isOneWay && isClose && !justTouchSwitch) SwitchAvailable(true);
-        }
-
-        private void OnDisable()
-        {
-            if (interactableListner)
-            {
-                interactableListner.OnIneractionCompleted -= OnInteractionCompleted;
-            }
         }
         #endregion
     }

@@ -6,19 +6,48 @@ namespace Sangki.Manager
 {
     public class GameManager : MonoBehaviour
     {
-        public static GameManager Instance;
+        public static GameManager Instance { get; private set; }
+
+        public GameState currentGameState { get; private set; }
+
+        public event UnityAction<GameState> OnGameStateChanged;
         public event UnityAction<int> OnInitialize;
+
         public UIManager UIManager;
 
         private void Awake()
         {
-            if (GameManager.Instance != null) Destroy(this);
-            else Instance = this;
+            if (Instance == null)
+            {
+                Instance = this;
+                DontDestroyOnLoad(gameObject);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
         }
 
         private void Start()
         {
-            if (OnInitialize != null) OnInitialize(PlayerController.Instance.maxHealth);
+            if (OnInitialize != null) OnInitialize(PlayerController.Instance.MaxHealth);
+        }
+
+        public void SetState(GameState newGameState)
+        {
+            if (newGameState == currentGameState)
+                return;
+
+            currentGameState = newGameState;
+            OnGameStateChanged?.Invoke(newGameState);
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                SetState(currentGameState == GameState.GamePlay ? GameState.Pause : GameState.GamePlay);
+            }
         }
     }
 }

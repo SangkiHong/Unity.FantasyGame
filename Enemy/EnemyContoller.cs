@@ -9,6 +9,8 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Events;
 using Sirenix.OdinInspector;
+using DarkTonic.MasterAudio;
+using EPOOutline;
 
 namespace Sangki.Enemy
 {
@@ -17,6 +19,8 @@ namespace Sangki.Enemy
     public class EnemyContoller : MonoBehaviour, IDamageable
     {
         #region VARIABLE
+        public event UnityAction OnDied;
+
         #region ABILITY
         [SerializeField]
         private bool noHit;
@@ -89,13 +93,6 @@ namespace Sangki.Enemy
         #endregion
         #endregion
 
-        #region INTERACTION
-        [Header("INTERACTION")]
-        [FoldoutGroup("INTERACTION")]
-        [SerializeField]
-        private InteractableListner interactableListner;
-        #endregion
-
         #region SEEK AND WONDER
         [Header("SEEK AND WONDER")]
         [FoldoutGroup("SEEK AND WONDER")]
@@ -105,7 +102,7 @@ namespace Sangki.Enemy
         [SerializeField]
         private float seekIdleDuration = 5f;
 
-        [Header("SEARCH PLAYER RADER")]
+        [Header("SEARCH PLAYER FindTarget")]
         [FoldoutGroup("SEEK AND WONDER")]
         [SerializeField]
         private bool debugRader;
@@ -158,6 +155,9 @@ namespace Sangki.Enemy
         private RuntimeAnimatorController archerAC, wizardAC;
         [FoldoutGroup("COMPONENTS")]
         [SerializeField]
+        private Outlinable outline;
+        [FoldoutGroup("COMPONENTS")]
+        [SerializeField]
         private bool canShotProjectile;
         [ShowIf("canShotProjectile")]
         [FoldoutGroup("COMPONENTS")]
@@ -189,6 +189,19 @@ namespace Sangki.Enemy
         private MMFeedbacks feedback_Dead;
         #endregion
 
+        #region SOUND
+        [FoldoutGroup("SOUND")]
+        [SerializeField]
+        private string hitSound;
+        [FoldoutGroup("SOUND")]
+        [SerializeField]
+        private string dieSound;
+        #endregion
+
+        #region PROPERTY
+        public Outlinable Outline => outline;
+        #endregion
+
         #region ETC
         private GameObject targetObject;
         private Transform thisTransform;
@@ -200,6 +213,8 @@ namespace Sangki.Enemy
         private NavMeshHit navHit;
         private Vector3 randomDirection;
 
+        private readonly string _ObjectPool_ImpactParticle = "SwordImpactOrange";
+        private readonly string _Tag_Player = "Player";
         private readonly string _Tag_DamageMelee = "DamageMelee";
         private readonly string _Tag_DamageObject = "DamageObject";
         private readonly string _String_EnemyStatsUI = "EnemyStatsUI"; 
@@ -223,8 +238,11 @@ namespace Sangki.Enemy
                     m_AnimPara_CastSkill,
                     m_AnimPara_Dodge,
                     m_AnimPara_Counterattack;
-        private bool isDead, 
-                     isDamaged,
+
+        [HideInInspector]
+        public bool isDead;
+
+        private bool isDamaged,
                      isDodge,
                      isNavMeshLink,
                      isOnShotLine,
@@ -242,10 +260,10 @@ namespace Sangki.Enemy
             defaultSpeed = navAgent.speed;
             defaultStopDist = navAgent.stoppingDistance;
 
-            if (!anim) anim = this.GetComponent<Animator>();
-            if (!navAgent) navAgent = this.GetComponent<NavMeshAgent>();
-            if (!thisCollider) thisCollider = this.GetComponent<Collider>();
-            if (!_rigidbody) _rigidbody = this.GetComponent<Rigidbody>();
+            if (!anim) TryGetComponent<Animator>(out anim);
+            if (!navAgent) TryGetComponent<NavMeshAgent>(out navAgent);
+            if (!thisCollider) TryGetComponent<Collider>(out thisCollider);
+            if (!_rigidbody) TryGetComponent<Rigidbody>(out _rigidbody);
 
             if (enemyType == EnemyType.Human)
             {
@@ -356,18 +374,18 @@ namespace Sangki.Enemy
 
             PlayerController.Instance.OnPlayerAttack += DodgeAttack;
 
-            while (!isDead)
+            while (!isDead && enabled)
             {
                 switch (enemyState)
                 {
                     case EnemyState.Idle:
-                        if (!PlayerController.Instance.isDead) Rader();
+                        if (!PlayerController.Instance.isDead) FindTarget();
                         break;
                     case EnemyState.Patrol:
-                        if (!PlayerController.Instance.isDead) Rader();
+                        if (!PlayerController.Instance.isDead) FindTarget();
                         break;
                     case EnemyState.Seek:
-                        if (!PlayerController.Instance.isDead) Rader();
+                        if (!PlayerController.Instance.isDead) FindTarget();
                         if (!navAgent.hasPath)
                         {
                             if (seekIdleTimer > seekIdleDuration)
@@ -590,12 +608,32 @@ namespace Sangki.Enemy
                 {
                     if (other.gameObject.layer == 9) // Player Attack
                     {
-                        Damage(PlayerController.Instance.attackPower);
+                        // FX
+                        PoolManager.instance.GetObject(_ObjectPool_ImpactParticle, other.transform.position);
+                        MasterAudio.PlaySound(hitSound);
+
+                        Damage(PlayerController.Instance.AttackPower);
                     }
                     else // Object Damage
                     {
                         Damage(1);
                     }
+                }
+            }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (enemyState != EnemyState.Chase && enemyState != EnemyState.Attack)
+            {
+                if (collision.gameObject.CompareTag(_Tag_Player))
+                {
+                    targetObject = collision.gameObject;
+                    navAgent.speed = defaultSpeed;
+                    navAgent.stoppingDistance = defaultStopDist;
+                    enemyState = EnemyState.Chase;
+
+                    StickEnemyUI(true, false);
                 }
             }
         }
@@ -632,8 +670,15 @@ namespace Sangki.Enemy
                 isDead = true;
                 enemyState = EnemyState.Dead;
                 anim.SetTrigger(m_AnimPara_Dead);
+
                 feedback_Dead?.PlayFeedbacks();
-                interactableListner?.Interact();
+                MasterAudio.PlaySound(dieSound);
+
+                // Interaction
+                OnDied?.Invoke();
+
+                // Player Targeting Check
+                PlayerController.Instance.targetingSystem.TargetCheck();
 
                 thisCollider.enabled = false;
                 if (enemyHealthBar)
@@ -814,7 +859,7 @@ namespace Sangki.Enemy
             }
         }
         // TARGET SEARCH RADER
-        private void Rader()
+        private void FindTarget()
         {
             if (targetObject = MovementUtility.WithinSight(thisTransform, offset, fieldOfViewAngle, viewDistance, PlayerController.Instance.gameObject, targetOffset, ignoreLayerMask, useTargetBone, targetBone))
             {
@@ -899,7 +944,7 @@ namespace Sangki.Enemy
             if (debugRader) MovementUtility.DrawLineOfSight(transform, offset, fieldOfViewAngle, angleOffset2D, viewDistance, usePhysics2D);
         }
 
-        private void OnDisable()
+        private void OnDestroy()
         {
             MovementUtility.ClearCache();
 
