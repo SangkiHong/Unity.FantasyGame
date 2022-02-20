@@ -2,7 +2,6 @@ using BehaviorDesigner.Runtime.Tasks.Movement;
 using DG.Tweening;
 using MoreMountains.Feedbacks;
 using Sangki.Player;
-using Sangki.Object;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -30,7 +29,7 @@ namespace Sangki.Enemy
         [Serializable]
         public struct DamageAbility
         {
-            public DamageTrigger damageTrigger;
+            public Object.DamageTrigger damageTrigger;
             public int damageAmount;
         }
 
