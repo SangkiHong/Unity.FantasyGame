@@ -4,7 +4,7 @@ using UnityEngine.AI;
 using MoreMountains.Feedbacks;
 using BehaviorDesigner.Runtime.Tasks.Movement;
 
-namespace Sangki
+namespace SK.FSM
 {
     public class EnemyDummy : MonoBehaviour
     {
@@ -63,8 +63,6 @@ namespace Sangki
         private Animator animator;
         [SerializeField]
         private NavMeshAgent navAgent;
-        [SerializeField]
-        private AttackColliderSwitch attackColliderSwitch;
 
         [Header("FEEDBACK")]
         [SerializeField]
@@ -221,9 +219,6 @@ namespace Sangki
 
                                     // Feedback
                                     feedback_Attack?.PlayFeedbacks();
-
-                                    // Collider On
-                                    attackColliderSwitch?.DoAttack();
                                 }
                             }
 
@@ -276,7 +271,6 @@ namespace Sangki
                     if (currentHealth > 0)
                     {
                         isDamaged = true;
-                        attackColliderSwitch.isCancel = true;
                         feedback_Damaged.PlayFeedbacks();
                         StartCoroutine(BlinkTimer());
 

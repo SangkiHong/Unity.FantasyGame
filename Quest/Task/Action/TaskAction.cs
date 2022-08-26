@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sangki.Quest
+namespace SK.Quest
 {
     public abstract class TaskAction : ScriptableObject
     {

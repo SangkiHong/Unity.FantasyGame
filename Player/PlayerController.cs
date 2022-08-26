@@ -5,20 +5,21 @@ using DarkTonic.MasterAudio;
 using DG.Tweening;
 using MoreMountains.Feedbacks;
 using Sirenix.OdinInspector;
-using Sangki.Enemy;
-using Sangki.Manager;
-using Sangki.States;
-using Sangki.Utility;
+using SK.FSM;
+using SK.Manager;
+using SK.States;
+using SK.Utility;
 
-namespace Sangki.Player
+namespace SK.Player
 {
     public class PlayerController : MonoBehaviour, IDamageable
     {
-        #region VARIABLE
         public static PlayerController Instance;
 
         [SerializeField]
         private bool onDebug;
+
+        #region VARIABLE
         #region UNITY ACTION
         public event UnityAction<int> OnDamagedReceived;
         public event UnityAction OnPlayerAttack;
@@ -29,42 +30,35 @@ namespace Sangki.Player
         #region COMPONENTS
         [Header("COMPONENTS")]
         [FoldoutGroup("COMPONENTS")]
-        public Transform thisTransform;
+        [SerializeField] internal Transform thisTransform;
         [FoldoutGroup("COMPONENTS")]
-        public Animator anim;
+        [SerializeField] internal Animator anim;
         [FoldoutGroup("COMPONENTS")]
-        public Rigidbody thisRigidbody;
+        [SerializeField] internal CharacterController characterController;
         [FoldoutGroup("COMPONENTS")]
-        public AttackColliderSwitch attackColliderSwitch;
+        [SerializeField] internal TargetingSystem targetingSystem;
         [FoldoutGroup("COMPONENTS")]
-        public TargetingSystem targetingSystem;
-        [FoldoutGroup("COMPONENTS")]
-        [SerializeField]
-        private CharacterController characterController;
-        [FoldoutGroup("COMPONENTS")]
-        [SerializeField]
-        private Transform shieldParent;
+        [SerializeField] private Transform shieldParent;
+        #endregion
+
+        #region INFO
+        [Header("INFO")]
+        [SerializeField] internal string CurrentState;
+        [SerializeField] internal Vector3 movemnt;
         #endregion
 
         #region PLAYER STATES
-        [SerializeField]
-        public string CurrentState;
-        public StateMachine stateMachine;
-        public StandingState STATE_Standing;
-        public JumpState STATE_Jump;
-        public AttackState STATE_Attack;
-        public DamagedState STATE_Damaged;
-        public DeadState STATE_Dead;
+        [Header("PLAYER STATES")]
+        [SerializeField] internal bool canDamage;
+        [SerializeField] private bool _isDead, _isOnGround, _isFalling;
         #endregion
 
         #region STATS
         [Header("STATS")]
         [FoldoutGroup("STATS")]
-        [SerializeField]
-        private int currentHealth;
+        [SerializeField] internal PlayerData playerData;
         [FoldoutGroup("STATS")]
-        [SerializeField]
-        private PlayerData data;
+        [SerializeField] private int currentHealth;
         #endregion
 
         #region FEEDBACKS
@@ -85,377 +79,146 @@ namespace Sangki.Player
         public MMFeedbacks feedback_Death;
         #endregion
 
-        #region PARTICLE
-        [Header("PARTICLE")]
-        [FoldoutGroup("PARTICLE")]
-        public ParticleSystem particle_Charging;
-        [FoldoutGroup("PARTICLE")]
-        public ParticleSystem particle_ChargeComplete;
-        [FoldoutGroup("PARTICLE")]
-        public ParticleSystem particle_RoundSlash;
-        #endregion
-
         #region ELSE
         [Header("ELSE")]
         [FoldoutGroup("ELSE")]
-        [SerializeField]
-        private LayerMask _fieldLayer;
+        [SerializeField] private LayerMask _fieldLayer;
         #endregion
 
-        #region Properties
-        public int AttackPower => data.attackPower;
-        public float AttackComboInterval => data.attackComboInterval;
-        public int MaxHealth => data.maxHealth;
-        public float Speed => data.speed;
-        public float SpeedOnShield => data.speedOnShield;
-        public float SpeedOnTargeting => data.speedOnTargeting;
-        public float JumpForce => data.jumpForce;
-        public float JumpIntervalDelay => data.jumpIntervalDelay;
-        public float DiveRollingForce => data.diveRollingForce;
-        public float BlinkTime => data.blinkTime;
-        public float ShieldRotateSpeed => data.shieldRotateSpeed;
-        public float ChargeTime => data.chargeTime;
-        public float ParryingTime => data.parryingTime;
-        public float StepSize => data.stepSize;
+        #region PROPERTIES
+        public bool IsDead => _isDead;
+        public bool IsOnGround => _isOnGround;
+        public int AttackPower => playerData.attackPower;
+        public int MaxHealth => playerData.maxHealth;
+        public float JumpTime => playerData.jumpTime;
+        public float JumpForce => playerData.jumpForce;
+        public float JumpIntervalDelay => playerData.jumpIntervalDelay;
+        public float DiveRollingForce => playerData.diveRollingForce;
+        public float BlinkTime => playerData.blinkTime;
+        public float ParryingTime => playerData.parryingTime;
         #endregion
 
         #region ETC
-        private Vector3 m_Movement, m_LerpMovement, m_RollingDir;
+        private StateMachine stateMachine;
 
-        [HideInInspector]
-        public float fixedDeltaTime, jumpIntervalTimer;
-        //[HideInInspector]
-        public bool isDead, isCharged, isChargingStart, isCharging, isOnShield;
-        //[HideInInspector]
-        public bool isOnControl = true, isOnGround;
-
-        private float shieldLayerWeight, chargeTimer, parryingTimer,
-                      attackComboTimer, fallingTimer;
-        [SerializeField]
-        private bool isRolling, isFalling;
-
-        #region STRINGS
-        private readonly int m_Anim_Para_SwordAttack = Animator.StringToHash("SwordAttack");
-        private readonly int m_Anim_Para_isParrying = Animator.StringToHash("isParrying"); 
-        private readonly int m_Anim_Para_ComboReady = Animator.StringToHash("ComboReady"); 
-        private readonly int m_Anim_Para_MoveBlend = Animator.StringToHash("MoveBlend");
-        private readonly int m_Anim_Para_Sidewalk = Animator.StringToHash("Sidewalk");
-        private readonly int m_Anim_Para_ChargingAttack = Animator.StringToHash("ChargingAttack"); 
-        private readonly int m_Anim_Para_Parrying = Animator.StringToHash("Parrying"); 
-        private readonly int m_Anim_Param_AttackCombo = Animator.StringToHash("AttackCombo");
-        private readonly int m_Anim_Para_DiveRolling = Animator.StringToHash("DiveRolling");
-        private readonly int m_Anim_Para_Falling = Animator.StringToHash("Falling");
-        private readonly int m_Anim_Para_Land = Animator.StringToHash("Land");
-        private readonly string m_ObjectPool_SwordImpactGold = "SwordImpactGold";
-        private readonly string m_Sound_FootSound = "FX_FootSound";
-        private readonly string m_Tag_DamageMelee = "DamageMelee";
-        private readonly string m_Tag_DamageObject = "DamageObject";
-        #endregion
-
+        internal float deltaTime, fixedDeltaTime, jumpIntervalTimer;
+        private float fallingTimer;
         #endregion
         #endregion
 
-        #region UNITY CALLBACK METHOD
+        #region 유니티 이벤트 함수
         private void Awake()
         {
-            if (PlayerController.Instance != null) Destroy(this);
+            if (Instance != null) Destroy(this);
             else Instance = this;
 
             thisTransform = this.transform;
-            fixedDeltaTime = Time.fixedDeltaTime;
             currentHealth = MaxHealth;
 
-            stateMachine = new StateMachine();
-            STATE_Standing = new StandingState(this, stateMachine);
-            STATE_Jump = new JumpState(this, stateMachine);
-            STATE_Attack = new AttackState(this, stateMachine);
-            STATE_Damaged = new DamagedState(this, stateMachine);
-            STATE_Dead = new DeadState(this, stateMachine);
-
-            stateMachine.Initialize(STATE_Standing);
-        }
-
-        private void OnDestroy()
-        {
-            GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
+            stateMachine = new StateMachine(this);
         }
 
         private void Start()
         {
-            GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+            // 인풋 함수 할당
+            InputManager.Instance.Input_Button_Jump += Button_Jump;
+            InputManager.Instance.Input_Button_Dodge += Button_Dodge;
+            InputManager.Instance.Input_Button_Attack += Button_Attack;
+            InputManager.Instance.Input_Button_Shield += Button_Shield;
+            InputManager.Instance.Input_Button_Interacting += Button_Interacting;
+            InputManager.Instance.Input_Button_Targeting += Button_Targeting;
         }
 
-        private void Update()
+        public void Tick()
         {
-            stateMachine.CurrentState.HandleInput();
+            deltaTime = Time.deltaTime;
 
-            stateMachine.CurrentState.LogicUpdate();
+            if (stateMachine.CurrentState != null)
+                stateMachine.CurrentState.Tick();
         }
 
-        private void FixedUpdate()
+        public void FixedTick()
         {
-            isOnGround = IsCheckGrounded();
+            fixedDeltaTime = Time.fixedDeltaTime;
 
-            if (!isDead)
+            CheckGrounded();
+
+            if (!IsDead)
             {
-                if (stateMachine.CurrentState != STATE_Attack && 
-                    stateMachine.CurrentState != STATE_Damaged)
+                if (stateMachine.CurrentState != stateMachine.STATE_Attack && 
+                    stateMachine.CurrentState != stateMachine.STATE_Damaged)
                 {
-#if UNITY_EDITOR
-                    GetKeyboard();
-#endif
-                    Movements();
-
-                    Shield();
-
                     RunTimer();
                 }
             }
 
-            stateMachine.CurrentState.PhysicsUpdate();
+            if (stateMachine.CurrentState != null)
+                stateMachine.CurrentState.FixedTick();
         }
         #endregion
 
-        #region MOVEMENT & CONTROL
-        private void Movements()
+        #region 컨트롤
+        public void Button_Jump(InputState inputState)
         {
-            if (isRolling)
+            // 버튼을 눌렀을 경우
+            if (inputState == InputState.onStart)
             {
-                // Moving Toward Diving Direction
-                thisRigidbody.MovePosition(thisTransform.position + (m_RollingDir * Speed * fixedDeltaTime));
+                if (!IsOnGround || stateMachine.CurrentState != stateMachine.STATE_Locomotion)
+                    return;
 
-                // Rotating Toward Diving Direction
-                thisTransform.rotation = Quaternion.LookRotation(Vector3.RotateTowards(transform.forward, m_RollingDir, 0.3f, 0));
-                return;
-            }
-
-            if (m_Movement.x != 0 || m_Movement.z != 0)
-            {
-                // Motion Blend
-                MoveMotionBlend();
-
-                // Rotate
-                Rotate();
-
-                // Movement
-                if (!isCharged)
-                {
-                    if (isOnShield)
-                        m_Movement *= Speed * SpeedOnShield * fixedDeltaTime;
-                    else if (targetingSystem.IsOnTargeting)
-                        m_Movement *= Speed * SpeedOnTargeting * fixedDeltaTime;
-                    else
-                        m_Movement *= Speed * fixedDeltaTime;
-
-                    thisRigidbody.MovePosition(thisTransform.position + m_Movement);
-                }
-            }
-            else
-            {
-                if (targetingSystem.IsOnTargeting)
-                {
-                    anim.SetFloat(m_Anim_Para_MoveBlend, 0);
-                    anim.SetFloat(m_Anim_Para_Sidewalk, 0);
-                }
-                float move = anim.GetFloat(m_Anim_Para_MoveBlend);
-                if (move > 0)
-                {
-                    move -= fixedDeltaTime * 7;
-                    anim.SetFloat(m_Anim_Para_MoveBlend, move >= 0 ? move : 0);
-                }
-            }
-        }
-
-        private void MoveMotionBlend()
-        {
-            // Targeting Mode
-            if (targetingSystem.IsOnTargeting)
-            {
-                anim.SetFloat(m_Anim_Para_Sidewalk, m_Movement.x);
-                anim.SetFloat(m_Anim_Para_MoveBlend, m_Movement.x > 0 ? m_Movement.x * -1 : m_Movement.x);
-            }
-            // Non-Targeting Mode
-            else
-            {
-                Vector2 move = new Vector2();
-                move.x = m_Movement.x;
-                move.y = m_Movement.z;
-                var magnitude = move.SqrMagnitude();
-                if (magnitude > 0.9f) magnitude = 1;
-
-                if (isOnShield || isCharged) anim.SetFloat(m_Anim_Para_MoveBlend, magnitude * 0.15f);
-                else anim.SetFloat(m_Anim_Para_MoveBlend, magnitude);
-            }
-        }
-
-        private void Rotate()
-        {
-            // Targeting Mode
-            if (targetingSystem.IsOnTargeting && !isRolling)
-            {
-                RotateToTarget(targetingSystem.TargetObject.transform.position, 0);
-
-                return;
-            }
-            // Non-Targeting Mode
-            if (!isOnShield)
-            {
-                thisTransform.rotation = Quaternion.LookRotation(Vector3.RotateTowards(transform.forward, m_Movement, 0.3f, 0));
-            }
-            else
-            {
-                m_LerpMovement = Vector3.Lerp(transform.forward, m_Movement, Time.deltaTime * ShieldRotateSpeed);
-                thisTransform.rotation = Quaternion.LookRotation(m_LerpMovement);
-            }
-        }
-
-        public void Move(Vector2 newMovement)
-        {
-            if (isOnControl)
-            {
-                m_Movement.x = newMovement.x;
-                m_Movement.z = newMovement.y;
-            }
-        }
-
-        private void Shield()
-        {
-            if (!anim.GetBool(m_Anim_Para_isParrying))
-            {
-                if (isOnShield)
-                {
-                    // Shield Motion On
-                    if (shieldLayerWeight < 1)
-                    {
-                        shieldLayerWeight += fixedDeltaTime * 5f;
-                        anim.SetLayerWeight(1, shieldLayerWeight);
-                    }
-
-                    // Parrying Timer
-                    if (parryingTimer < ParryingTime) parryingTimer += fixedDeltaTime;
-                }
+                // 타겟팅 중이 아닌 경우 일반 점프
+                if (!targetingSystem.IsOnTargeting)
+                    stateMachine.ChangeState(stateMachine.STATE_Jump);
                 else
-                {
-                    // Shield Motion Off
-                    if (shieldLayerWeight > 0)
-                    {
-                        shieldLayerWeight -= fixedDeltaTime * 5f;
-                        anim.SetLayerWeight(1, shieldLayerWeight);
-                    }
+                { // 타겟팅 중인 경우 닷지 작동{
+                  // Initialize
+                    InputManager.Instance.SetControlState(false);
 
-                    // Charging Attack Timer
-                    if (isCharging && !isCharged)
-                    {
-                        if (ChargeTime > chargeTimer)
-                        {
-                            chargeTimer += fixedDeltaTime;
+                    // 애니메이션
+                    //anim.SetTrigger(Strings.AnimPara_Dodge);
 
-                            if (chargeTimer > 0.3f && !isChargingStart)
-                            {
-                                isChargingStart = true;
-                                particle_Charging.Play();
-                            }
-                        }
-                        else
-                        {
-                            isCharged = true;
-                            isChargingStart = false;
-                            anim.SetTrigger(m_Anim_Para_ChargingAttack);
-                            particle_ChargeComplete.Play();
-                        }
-                    }
+                    // 닷지 방향(캐릭터 전방)
+                    if (targetingSystem.IsOnTargeting)
+                        stateMachine.STATE_Locomotion.ExecuteDodge(thisTransform.forward);
                 }
+            }
+            // 버튼을 뗐을 경우
+            else if (inputState == InputState.onEnd)
+            {
+                if (stateMachine.STATE_Jump.ButtonOn)
+                    stateMachine.STATE_Jump.StopJump();
             }
         }
 
-        public void OnEndRolling()
+        public void Button_Attack(InputState inputState)
         {
-            isOnControl = true;
-            isRolling = false;
-        }
-        #endregion
-
-        #region BUTTONS
-        public void Button_Jump()
-        {
-            if (isRolling || !isOnControl || !isOnGround ||
-                stateMachine.CurrentState == STATE_Jump ||
-                stateMachine.CurrentState == STATE_Damaged)
+            if (!IsOnGround || stateMachine.CurrentState == stateMachine.STATE_Damaged || 
+                stateMachine.CurrentState == stateMachine.STATE_Jump)
                 return;
 
-            if (!targetingSystem.IsOnTargeting) // Jumping
-            {
-                stateMachine.ChangeState(STATE_Jump);
-            }
-            else // Dive Rolling
-            {
-                // Initialize
-                isOnControl = false;
-                isRolling = true;
-                anim.SetTrigger(m_Anim_Para_DiveRolling);
+            OnPlayerAttack?.Invoke();
+        }
 
-                // Set Dive Direction
-                if (targetingSystem.IsOnTargeting) // Set off Targeting
-                {
-                    m_RollingDir = m_Movement * DiveRollingForce;
-                }
-                else
-                    m_RollingDir = thisTransform.forward * DiveRollingForce;
+        public void Button_Dodge()
+        {
+            if (!IsOnGround || stateMachine.CurrentState != stateMachine.STATE_Locomotion)
+                return;
+
+        }
+
+        public void Button_Shield(InputState inputState)
+        {
+            if (IsOnGround)
+            {
                 
             }
         }
 
-        public void Button_Attack(bool isOn)
+        public void Button_Interacting(InputState inputState)
         {
-            if (!isOnGround || stateMachine.CurrentState == STATE_Damaged || stateMachine.CurrentState == STATE_Jump)
-                return;
-
-            if (isOn)
-            {
-                isCharged = false;
-                isCharging = true;
-            }
-            else
-            {
-                isCharging = false;
-                isChargingStart = false;
-
-                if (isOnGround)
-                {
-                    if (!isOnShield)
-                    {
-                        if (stateMachine.CurrentState != STATE_Attack)
-                        {
-                            stateMachine.ChangeState(STATE_Attack);
-
-                            OnPlayerAttack?.Invoke();
-                        }
-                    }
-                }
-
-                chargeTimer = 0;
-            }
-        }
-
-        public void Button_Shield(bool isOn)
-        {
-            if (isOnGround)
-            {
-                isOnShield = isOn;
-
-                // Initialize
-                if (!isOn)
-                {
-                    parryingTimer = 0;
-                }
-            }
-        }
-
-        public void Button_Interacting()
-        {
-            if (stateMachine.CurrentState == STATE_Jump ||
-                stateMachine.CurrentState == STATE_Damaged ||
-                stateMachine.CurrentState == STATE_Dead) return;
+            if (stateMachine.CurrentState == stateMachine.STATE_Jump ||
+                stateMachine.CurrentState == stateMachine.STATE_Damaged ||
+                stateMachine.CurrentState == stateMachine.STATE_Dead) return;
 
             if (OnInteractable != null)
             {
@@ -464,107 +227,21 @@ namespace Sangki.Player
             }
         }
 
-        public void Button_Targeting(bool isOn) => targetingSystem.SetTargeting(isOn);
-
-        private void GetKeyboard()
+        public void Button_Targeting(InputState inputState)
         {
-            if (Input.GetAxis("Horizontal") != 0)
-            {
-                m_Movement.x = Input.GetAxis("Horizontal");
-            }
-            if (Input.GetAxis("Vertical") != 0)
-            {
-                m_Movement.z = Input.GetAxis("Vertical");
-            }
-            if (Input.GetKeyUp(KeyCode.Z)) Button_Targeting(true);
-            if (Input.GetKeyUp(KeyCode.X)) Button_Targeting(false);
-
-            if (Input.GetKeyDown(KeyCode.A)) Button_Attack(true);
-            if (Input.GetKeyUp(KeyCode.A)) Button_Attack(false);
-
-            if (Input.GetKeyDown(KeyCode.S)) Button_Shield(true);
-            if (Input.GetKeyUp(KeyCode.S)) Button_Shield(false);
-
-            if (Input.GetKeyDown(KeyCode.Space)) Button_Jump();
+            if (inputState == InputState.onStart)
+                targetingSystem.SetTargeting(true);
+            else if (inputState == InputState.onEnd)
+                targetingSystem.SetTargeting(false);
         }
         #endregion
 
-        #region ATTACK
-        public void MeleeAttack()
-        {
-            // Feedback
-            feedbackm_Attack?.PlayFeedbacks();
-
-            // Collider On
-            attackColliderSwitch.DoAttack();
-
-            // Step
-            thisRigidbody.MovePosition(thisTransform.position + thisTransform.forward * StepSize);
-
-            // Combo
-            attackComboTimer = 0;
-            int combo = anim.GetInteger(m_Anim_Param_AttackCombo);
-            anim.SetInteger(m_Anim_Param_AttackCombo, ++combo);
-            if (combo >= 3) anim.SetInteger(m_Anim_Param_AttackCombo, 0);
-            anim.SetBool(m_Anim_Para_ComboReady, true);
-        }
-
-        public void OnAttackEnd()
-        {
-            attackColliderSwitch.EndAttack();
-            stateMachine.ChangeState(STATE_Standing);
-        }
-
-        public void InitializeAttack()
-        {
-            chargeTimer = 0;
-            attackComboTimer = 0;
-
-            isChargingStart = false;
-            isCharging = false;
-            isCharged = false;
-
-            anim.ResetTrigger(m_Anim_Para_ChargingAttack);
-            anim.ResetTrigger(m_Anim_Para_SwordAttack);
-            anim.SetBool(m_Anim_Para_ComboReady, false);
-            anim.SetInteger(m_Anim_Param_AttackCombo, 0);
-
-            if (feedbackm_Attack.IsPlaying) feedbackm_Attack?.StopFeedbacks();
-        }
-        #endregion
-
-        #region DAMAGE & SHIELD
-        public void OnDamageTrigger(GameObject triggerObejct, int damageAmount)
-        {
-            if (isDead && stateMachine.CurrentState == STATE_Damaged) return;
-
-            if (!anim.GetBool(m_Anim_Para_isParrying) && !onDebug)
-            {
-                bool isEnemy = triggerObejct.CompareTag(m_Tag_DamageMelee),
-                     isDamageObejct = triggerObejct.CompareTag(m_Tag_DamageObject);
-
-                if (isEnemy || isDamageObejct)
-                {
-                    if (isOnShield)
-                    {
-                        // 적의 방향 각도에 따른 쉴드 처리 또는 패링
-                        if (IsSuccessShield(isEnemy, triggerObejct.transform.position - thisTransform.position)) return;
-                    }
-
-                    if (!targetingSystem.IsOnTargeting) RotateToTarget(triggerObejct.transform.position, 0.5f);
-                    
-                    Damage(damageAmount);
-                }
-            }
-        }
-
+        #region 데미지
         public void Damage(int damageAmount)
         {
-            InitializeAttack();
-
-            isOnShield = false;
+            /*isOnShield = false;
             isRolling = false;
-            attackColliderSwitch.isCancel = true;
+            //attackColliderSwitch.isCancel = true;
 
             ResetAllTriggers();
 
@@ -579,7 +256,7 @@ namespace Sangki.Player
             // Damaged
             if (currentHealth > 0)
             {
-                stateMachine.ChangeState(STATE_Damaged);
+                stateMachine.ChangeState(stateMachine.STATE_Damaged);
                 feedback_Knockback.PlayFeedbacks();
             }
             // Died
@@ -587,75 +264,55 @@ namespace Sangki.Player
             {
                 isDead = true;
                 isOnControl = false;
-                stateMachine.ChangeState(STATE_Dead);
+                stateMachine.ChangeState(stateMachine.STATE_Dead);
                 feedback_Death.PlayFeedbacks();
-            }
+            }*/
         }
 
-        private bool IsSuccessShield(bool isEnemy, Vector3 targetDir)
+        /*public void OnDamageTrigger(GameObject triggerObejct, int damageAmount)
         {
-            var enemyAngle = Vector3.Angle(targetDir, thisTransform.forward);
-            if (enemyAngle < 90)
-            {
-                if (isEnemy)
-                {
-                    // 패링 작동
-                    if (parryingTimer < ParryingTime && shieldLayerWeight < 0.5f)
-                    {
-                        shieldLayerWeight = 0;
-                        anim.SetLayerWeight(1, 0);
-                        anim.SetTrigger(m_Anim_Para_Parrying);
-                        feedback_Parrying?.PlayFeedbacks();
-                        // FX
-                        PoolManager.instance.GetObject(m_ObjectPool_SwordImpactGold, shieldParent.position);
+            if (onDebug && !canDamage && isDead && stateMachine.CurrentState == stateMachine.STATE_Damaged) return;
 
-                        isOnShield = false;
-                    }
-                    // 일반 쉴드
-                    else feedback_ShieldDefense?.PlayFeedbacks();
+            bool isDamageObejct = triggerObejct.CompareTag(Strings.Tag_DamageObject);
+
+            if (isDamageObejct)
+            {
+                //if (isOnShield)
+                {
+                    // 적의 방향 각도에 따른 쉴드 처리 또는 패링
+                    //if (IsSuccessShield(isEnemy, triggerObejct.transform.position - thisTransform.position)) return;
                 }
 
-                return true;
+                if (!targetingSystem.IsOnTargeting) RotateToTarget(triggerObejct.transform.position, 0.5f);
+
+                Damage(damageAmount);
             }
-            return false;
-        }
+        }*/
 
         private void ResetAllTriggers()
         {
-            anim.ResetTrigger(m_Anim_Para_SwordAttack);
-            anim.ResetTrigger(m_Anim_Para_ChargingAttack);
-            anim.ResetTrigger(m_Anim_Para_Parrying);
-            anim.ResetTrigger(m_Anim_Para_Falling);
-            anim.ResetTrigger(m_Anim_Para_DiveRolling);
-            anim.ResetTrigger(m_Anim_Para_Land);
+            anim.ResetTrigger(Strings.AnimPara_Attack);
+            anim.ResetTrigger(Strings.AnimPara_Parrying);
+            anim.ResetTrigger(Strings.AnimPara_Falling);
+            anim.ResetTrigger(Strings.AnimPara_Dodge);
+            anim.ResetTrigger(Strings.AnimPara_Land);
         }
         #endregion
 
-        #region PUBLIC METHOD
-        public void FootSound() => MasterAudio.PlaySound(m_Sound_FootSound);
+        #region 애니메이션
+        public void FootSound() => MasterAudio.PlaySound(Strings.Sound_FootSound);
         #endregion
 
         #region UTILITY
         private void RunTimer()
         { 
-            // Combo Attack Timer
-            if (anim.GetBool(m_Anim_Para_ComboReady))
-            {
-                if (attackComboTimer < AttackComboInterval)
-                    attackComboTimer += fixedDeltaTime;
-                else // Initialize
-                {
-                    InitializeAttack();
-                }
-            }
-
             // Jump Interval Timer
             if (jumpIntervalTimer > 0) jumpIntervalTimer -= fixedDeltaTime;
 
             // Falling Timer
-            if (!isOnGround)
+            if (!IsOnGround)
             {
-                if (!isFalling)
+                if (!_isFalling)
                 {
                     if (fallingTimer < 0.55f)
                     {
@@ -663,27 +320,27 @@ namespace Sangki.Player
                     }
                     else
                     {
-                        isFalling = true;
+                        _isFalling = true;
                         fallingTimer = 0;
-                        anim.SetTrigger(m_Anim_Para_Falling); // Falling Animation
+                        anim.SetTrigger(Strings.AnimPara_Falling); // Falling Animation
                     }
                 }
             }
             else
             {
-                if (isFalling)
+                if (_isFalling)
                 {
-                    isFalling = false;
-                    anim.SetTrigger(m_Anim_Para_Land); // Landing Animation
+                    _isFalling = false;
+                    anim.SetTrigger(Strings.AnimPara_Land); // Landing Animation
                 }
                 if (fallingTimer > 0) fallingTimer = 0;
             }
         }
 
-        private bool IsCheckGrounded()
+        private void CheckGrounded()
         {
             // CharacterController.IsGrounded가 true라면 Raycast를 사용하지 않고 판정 종료
-            if (characterController.isGrounded) return true;
+            if (characterController.isGrounded) _isOnGround = true;
 
             // 발사하는 광선의 초기 위치와 방향
             // 약간 신체에 박혀 있는 위치로부터 발사하지 않으면 제대로 판정할 수 없을 때가 있다.
@@ -693,10 +350,16 @@ namespace Sangki.Player
 
             Debug.DrawRay(thisTransform.position - (thisTransform.forward * 0.3f), Vector3.down * maxDistance, Color.green);
 
-            return Physics.Raycast(ray1, maxDistance, _fieldLayer);
+            _isOnGround = Physics.Raycast(ray1, maxDistance, _fieldLayer);
+
+            if (!_isOnGround && stateMachine.CurrentState == stateMachine.STATE_Locomotion)
+            {
+                Vector3 slipDirection = thisTransform.forward + (Vector3.down * 10);
+                characterController.Move(slipDirection * fixedDeltaTime);
+            }
         }
 
-        private void RotateToTarget(Vector3 targetPos, float duration)
+        internal void RotateToTarget(Vector3 targetPos, float duration)
         {
             Vector3 dirToTarget = targetPos - thisTransform.position;
             dirToTarget = Quaternion.LookRotation(dirToTarget, Vector3.up).eulerAngles;
@@ -704,25 +367,6 @@ namespace Sangki.Player
 
             if (duration > 0) thisTransform.DORotate(dirToTarget, duration);
             else thisTransform.rotation = Quaternion.Euler(dirToTarget);
-        }
-                
-        private void OnGameStateChanged(GameState newGameState)
-        {
-            enabled = newGameState == GameState.GamePlay;
-
-            anim.enabled = enabled;
-            thisRigidbody.useGravity = enabled;
-            if (enabled) thisRigidbody.constraints = RigidbodyConstraints.FreezeRotation;
-            else thisRigidbody.constraints = RigidbodyConstraints.FreezeAll;
-
-            if (particle_Charging.isPlaying) particle_Charging.Pause(true);
-            else if (particle_Charging.isPaused) particle_Charging.Play();
-
-            if (particle_ChargeComplete.isPlaying) particle_ChargeComplete.Pause(true);
-            else if (particle_ChargeComplete.isPaused) particle_ChargeComplete.Play();
-
-            if (particle_RoundSlash.isPlaying) particle_RoundSlash.Pause(true);
-            else if (particle_RoundSlash.isPaused) particle_RoundSlash.Play();
         }
         #endregion
     }

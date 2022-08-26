@@ -1,7 +1,7 @@
 using BehaviorDesigner.Runtime.Tasks.Movement;
 using DG.Tweening;
 using MoreMountains.Feedbacks;
-using Sangki.Player;
+using SK.Player;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -11,7 +11,7 @@ using Sirenix.OdinInspector;
 using DarkTonic.MasterAudio;
 using EPOOutline;
 
-namespace Sangki.Enemy
+namespace SK.FSM
 {
     [RequireComponent(typeof(NavMeshAgent))]
     [RequireComponent(typeof(Animator))]
@@ -145,9 +145,6 @@ namespace Sangki.Enemy
         [FoldoutGroup("COMPONENTS")]
         [SerializeField]
         private NavMeshAgent navAgent;
-        [FoldoutGroup("COMPONENTS")]
-        [SerializeField]
-        private AttackColliderSwitch attackColliderSwitch;
         [ShowIf("enemyType", EnemyType.Human)]
         [FoldoutGroup("COMPONENTS")]
         [SerializeField]
@@ -371,25 +368,23 @@ namespace Sangki.Enemy
         {
             yield return ws_State;
 
-            PlayerController.Instance.OnPlayerAttack += DodgeAttack;
-
             while (!isDead && enabled)
             {
                 switch (enemyState)
                 {
                     case EnemyState.Idle:
-                        if (!PlayerController.Instance.isDead) FindTarget();
+                        if (!Player.PlayerController.Instance.IsDead) FindTarget();
                         break;
                     case EnemyState.Patrol:
-                        if (!PlayerController.Instance.isDead) FindTarget();
+                        if (!Player.PlayerController.Instance.IsDead) FindTarget();
                         break;
                     case EnemyState.Seek:
-                        if (!PlayerController.Instance.isDead) FindTarget();
+                        if (!Player.PlayerController.Instance.IsDead) FindTarget();
                         if (!navAgent.hasPath)
                         {
                             if (seekIdleTimer > seekIdleDuration)
                             {
-                                Vector3 randomPos = SeekAndWonder(seekDistance, 6);
+                                Vector3 randomPos = SeekAndWonder(seekDistance);
                                 navAgent.SetDestination(randomPos);
                                 anim.SetBool(m_AnimPara_isMove, true);
                                 seekIdleTimer = 0;
@@ -611,7 +606,7 @@ namespace Sangki.Enemy
                         PoolManager.instance.GetObject(_ObjectPool_ImpactParticle, other.transform.position);
                         MasterAudio.PlaySound(hitSound);
 
-                        Damage(PlayerController.Instance.AttackPower);
+                        Damage(Player.PlayerController.Instance.AttackPower);
                     }
                     else // Object Damage
                     {
@@ -642,7 +637,6 @@ namespace Sangki.Enemy
             currentHealth -= damageAmount;
             isDamaged = true;
             navAgent.isStopped = true;
-            attackColliderSwitch.isCancel = true;
             feedback_Attack?.StopFeedbacks();
 
             CancelAttack();
@@ -656,7 +650,7 @@ namespace Sangki.Enemy
                 if (enemyState != EnemyState.Attack)
                 {
                     anim.SetBool(m_AnimPara_isFight, true);
-                    targetObject = PlayerController.Instance.gameObject;
+                    targetObject = Player.PlayerController.Instance.gameObject;
                     navAgent.speed = defaultSpeed;
                     navAgent.stoppingDistance = defaultStopDist;
                     enemyState = EnemyState.Attack;
@@ -677,7 +671,7 @@ namespace Sangki.Enemy
                 OnDied?.Invoke();
 
                 // Player Targeting Check
-                PlayerController.Instance.targetingSystem.TargetCheck();
+                Player.PlayerController.Instance.targetingSystem.TargetCheck();
 
                 thisCollider.enabled = false;
                 if (enemyHealthBar)
@@ -754,8 +748,6 @@ namespace Sangki.Enemy
             {
                 // Feedback
                 feedback_Attack?.PlayFeedbacks();
-                // Collider On
-                attackColliderSwitch?.DoAttack();
                 // Step
                 navAgent.Move(thisTransform.forward * attackStepsize);
             }
@@ -860,7 +852,7 @@ namespace Sangki.Enemy
         // TARGET SEARCH RADER
         private void FindTarget()
         {
-            if (targetObject = MovementUtility.WithinSight(thisTransform, offset, fieldOfViewAngle, viewDistance, PlayerController.Instance.gameObject, targetOffset, ignoreLayerMask, useTargetBone, targetBone))
+            if (targetObject = MovementUtility.WithinSight(thisTransform, offset, fieldOfViewAngle, viewDistance, Player.PlayerController.Instance.gameObject, targetOffset, ignoreLayerMask, useTargetBone, targetBone))
             {
                 navAgent.speed = defaultSpeed;
                 navAgent.stoppingDistance = defaultStopDist;
@@ -871,7 +863,7 @@ namespace Sangki.Enemy
         }
 
         // SEEK AND WONDER
-        private Vector3 SeekAndWonder(float distance, int layermask)
+        private Vector3 SeekAndWonder(float distance)
         {
             randomDirection = UnityEngine.Random.insideUnitSphere * distance;
 
@@ -908,7 +900,7 @@ namespace Sangki.Enemy
 
         private bool CheckPlayerAlive()
         {
-            if (PlayerController.Instance.isDead)
+            if (Player.PlayerController.Instance.IsDead)
             {
                 anim.SetBool(m_AnimPara_isFight, false);
                 navAgent.ResetPath();
@@ -946,8 +938,6 @@ namespace Sangki.Enemy
         private void OnDestroy()
         {
             MovementUtility.ClearCache();
-
-            PlayerController.Instance.OnPlayerAttack -= DodgeAttack;
         }
         #endregion
     }

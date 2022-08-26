@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using Sangki.Enemy;
+using SK.FSM;
 
-namespace Sangki.Utility
+namespace SK.Utility
 {
     public class TargetingSystem : MonoBehaviour
     {

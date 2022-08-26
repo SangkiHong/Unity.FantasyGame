@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
 
-namespace Sangki
+namespace SK
 {
     public class CreateItemList
     {

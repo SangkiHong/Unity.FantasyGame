@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 
-namespace Sangki
+namespace SK
 {
     [CustomEditor(typeof(ItemList))]
     public class ItemLIstEditor : EditorWindow

@@ -1,5 +1,5 @@
 using UnityEngine;
-using Sangki.Enemy;
+using SK.FSM;
 using DG.Tweening;
 
 [RequireComponent(typeof(EnemyContoller))]

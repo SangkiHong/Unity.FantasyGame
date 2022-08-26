@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.Events;
-using Sangki.Player;
+using SK.Player;
 
-namespace Sangki.Manager
+namespace SK.Manager
 {
     public class GameManager : MonoBehaviour
     {
@@ -30,7 +30,7 @@ namespace Sangki.Manager
 
         private void Start()
         {
-            if (OnInitialize != null) OnInitialize(PlayerController.Instance.MaxHealth);
+            if (OnInitialize != null) OnInitialize(Player.PlayerController.Instance.MaxHealth);
         }
 
         public void SetState(GameState newGameState)

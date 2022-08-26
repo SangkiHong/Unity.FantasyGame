@@ -1,85 +1,119 @@
-﻿
-using Sangki.Player;
-using UnityEngine;
+﻿using UnityEngine;
+using SK.Player;
+using SK.Manager;
 
-namespace Sangki.States
+namespace SK.States
 {
     public class JumpState : State
     {
-        private readonly int m_Anim_Para_isAttack = Animator.StringToHash("isAttack");
-        private readonly int m_Anim_Para_Jump = Animator.StringToHash("Jump");
-        private readonly int m_Anim_Para_Land = Animator.StringToHash("Land");
-        private float intervalTimer;
-        private bool isJump;
+        private readonly PlayerController _player;
+        private readonly StateMachine _stateMachine;
 
-        public JumpState(PlayerController player, StateMachine stateMachine) : base(player, stateMachine)
+        private readonly Animator _aim;
+        private readonly CharacterController _characterController;
+
+        private Vector3 _direction;
+        private float _elapsed;
+
+        public bool ButtonOn { get; private set; }
+
+        public JumpState(PlayerController player, StateMachine stateMachine)
         {
+            _player = player;
+            _stateMachine = stateMachine;
+            _aim = player.anim;
+            _characterController = _player.characterController;
         }
 
         public override void Enter()
         {
             base.Enter();
+
+            ButtonOn = true;
+
+            // 애니메이션 초기화
+            _aim.SetLayerWeight(1, 0);
+            _aim.ResetTrigger(Strings.AnimPara_Land);
             Jump();
         }
 
         public override void Exit()
         {
             base.Exit();
-
-            if (isJump)
-            {
-                isJump = false;
-            }
         }
 
-        public override void PhysicsUpdate()
+        public override void FixedTick()
         {
-            base.PhysicsUpdate();
-            if (isJump)
+            base.FixedTick();
+
+            var jumpPoint = _elapsed / _player.JumpTime;
+            float fixedTime = _player.fixedDeltaTime;
+
+
+            // 점프 중인 경우 가장 높이 올라갔을 때부터 착지 여부 확인
+            if ((ButtonOn && 0.3f < jumpPoint && jumpPoint < 0.5f) || jumpPoint <= 0.3f)
             {
-                if (intervalTimer < 0.4f)
+                Vector2 dir = InputManager.Instance.Movement;
+                _direction.x = dir.x;
+                _direction.y = EasingFunction.EaseOutCubic(0, 1, jumpPoint * 2);
+                _direction.z = dir.y;
+                _direction *= _player.JumpForce * fixedTime;
+            }
+            else 
+            {
+                if (_direction.y > Physics.gravity.y) 
+                    _direction.y += fixedTime * jumpPoint * Physics.gravity.y;
+
+                if (_player.IsOnGround) 
                 {
-                    intervalTimer += player.fixedDeltaTime;
-                }
-                else
-                {
-                    if (player.isOnGround)
-                    {
-                        player.anim.SetTrigger(m_Anim_Para_Land); // Landing Animation
-                        stateMachine.ChangeState(player.STATE_Standing);
-                    }
+                    // 초기화
+                    _elapsed = 0;
+
+                    _aim.SetTrigger(Strings.AnimPara_Land); // Landing Animation
+                    _stateMachine.ChangeState(_stateMachine.STATE_Locomotion);
+
+                    _aim.SetTrigger(Strings.AnimPara_Land);
+
+                    // 사운드 효과
+                    //AudioManager.Instance.PlayAudio(Strings.Audio_FX_Player_Land, _transform);
+                    return;
                 }
             }
+
+            if (jumpPoint < 1)
+                _elapsed += fixedTime;
+            else
+                _elapsed = _player.JumpTime;
+
+            _characterController.Move(_direction);
         }
 
         private void Jump()
         {
-            if (!isJump && player.jumpIntervalTimer <= 0 && player.isOnGround && player.isOnControl)
-            {
-                if (!player.anim.GetBool(m_Anim_Para_isAttack))
-                {
-                    isJump = true;
-                    // Animation
-                    player.anim.SetTrigger(m_Anim_Para_Jump);
+            if (_player.jumpIntervalTimer <= 0 && _player.IsOnGround && InputManager.Instance.IsOnControl) {
+                if (!_aim.GetBool(Strings.AnimPara_OnAttack)) {
+                    // 애니메이션
+                    _aim.SetTrigger(Strings.AnimPara_Jump);
 
-                    player.thisRigidbody.AddForce(Vector3.up * (player.JumpForce * -Physics.gravity.y));
+                    // 점프 시 피드백 실행
+                    _player.feedback_Jump?.PlayFeedbacks();
 
-                    // Feedback
-                    player.feedback_Jump?.PlayFeedbacks();
+                    // 점프 후 착지 판정 사이의 간격 타이머
+                    _player.jumpIntervalTimer = _player.JumpIntervalDelay;
 
-                    // Jump Interval Timer
-                    player.jumpIntervalTimer = player.JumpIntervalDelay;
-
-                    // Initialize
-                    intervalTimer = 0;
-                    player.InitializeAttack();
-                    if (player.isOnShield)
+                    // 정프 방향으로 회전
+                    Vector2 dir = InputManager.Instance.Movement;
+                    if (dir != Vector2.zero)
                     {
-                        player.anim.SetLayerWeight(1, 0);
-                        player.isOnShield = false;
+                        _direction.x = dir.x;
+                        _direction.y = 0;
+                        _direction.z = dir.y;
+                        _player.thisTransform.rotation = Quaternion.LookRotation(_direction, Vector3.up);
                     }
                 }
             }
         }
+
+        public void StopJump() => ButtonOn = false;
     }
 }

@@ -3,9 +3,9 @@ using Sirenix.OdinInspector;
 using DG.Tweening;
 using EPOOutline;
 using MoreMountains.Feedbacks;
-using Sangki.Enemy;
+using SK.FSM;
 
-namespace Sangki.Object
+namespace SK.Object
 {
     public class InteractableObjects : MonoBehaviour, IInteractable
     {
@@ -149,7 +149,7 @@ namespace Sangki.Object
         #region TRIGGER
         private void OnTriggerEnter(Collider other)
         {
-            if (interactableListner.isOneWay && isInteracted || Player.PlayerController.Instance.isDead) return;
+            if (interactableListner.isOneWay && isInteracted || Player.PlayerController.Instance.IsDead) return;
 
             if (other.CompareTag(m_Tag_Player)) 
             {
@@ -176,7 +176,7 @@ namespace Sangki.Object
                 }
                 else
                 {
-                    if (!interactableListner.isOneWay && isInteracted && !Player.PlayerController.Instance.isDead) Interact();
+                    if (!interactableListner.isOneWay && isInteracted && !Player.PlayerController.Instance.IsDead) Interact();
                 }
             }
         }

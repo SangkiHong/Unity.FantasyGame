@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
-using Sangki.Player;
+using SK.Player;
 
-namespace Sangki.Manager
+namespace SK.Manager
 {
     public class UIManager : MonoBehaviour
     {
@@ -14,7 +14,7 @@ namespace Sangki.Manager
         private void OnEnable()
         {
             GameManager.Instance.OnInitialize += Initialize;
-            PlayerController.Instance.OnDamagedReceived += UpdatePlayerHealth;
+            Player.PlayerController.Instance.OnDamagedReceived += UpdatePlayerHealth;
         }
 
 
@@ -35,7 +35,7 @@ namespace Sangki.Manager
         private void OnDestroy()
         {
             GameManager.Instance.OnInitialize -= Initialize;
-            PlayerController.Instance.OnDamagedReceived -= UpdatePlayerHealth;
+            Player.PlayerController.Instance.OnDamagedReceived -= UpdatePlayerHealth;
         }
     }
 }

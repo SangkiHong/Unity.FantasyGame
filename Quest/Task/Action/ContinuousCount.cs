@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace Sangki.Quest
+namespace SK.Quest
 {
     [CreateAssetMenu(menuName = "Quest/Task/Action/ContinuousCount", fileName = "Continuous Count")]
     public class ContinuousCount : TaskAction

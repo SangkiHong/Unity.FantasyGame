@@ -1,73 +1,58 @@
 using UnityEngine;
 using DG.Tweening;
 using Sirenix.OdinInspector;
-using Sangki.Player;
+using SK.Player;
 
-namespace Sangki.Object
+namespace SK.Object
 {
 	public class ProjectileObject : PoolObject
 	{
-		[SerializeField]
-		private float speed = 30f;
-		[SerializeField]
-		private float lifetime = 4.5f;
-		[SerializeField]
-		private bool isRotate;
+		[SerializeField] private float speed = 30f;
+		[SerializeField] private float lifetime = 4.5f;
+		[SerializeField] private bool isRotate;
+
 		[ShowIf("isRotate")]
-		[SerializeField]
-		private float rotateSpeed = 1.5f;
-		[SerializeField]
-		private bool isTrajectory;
+		[SerializeField] private float rotateSpeed = 1.5f;
+		[SerializeField] private bool isTrajectory;
+
 		[ShowIf("isTrajectory")]
-		[SerializeField]
-		private float arcAmount = 1;
+		[SerializeField] private float arcAmount = 1;
+
 		[Header("Damage")]
-		[SerializeField]
-		private int damageAmount = 1;
+		[SerializeField] private int damageAmount = 1;
 
-		Transform thisTransform;
-		Rigidbody myRigidbody;
-		Collider thisCollider;
-
-		Vector3 m_StartPosition, m_TargetPos;
-
-		readonly string m_Tag_Player = "Player";
-		readonly string m_Tag_Ground = "Ground";
-
+		private Transform thisTransform;
+		private Rigidbody thisRigidbody;
+		private Collider thisCollider;
 
 		public override void OnAwake()
 		{
-			if (!myRigidbody) TryGetComponent<Rigidbody>(out myRigidbody);
-			if (!thisTransform) thisTransform = this.transform;
-			if (!thisCollider) TryGetComponent<Collider>(out thisCollider);
+			if (!thisTransform) thisTransform = transform;
+			if (!thisRigidbody) TryGetComponent(out thisRigidbody);
+			if (!thisCollider) TryGetComponent(out thisCollider);
 
 			thisCollider.enabled = true;
 
 			// Clear old values
-			myRigidbody.velocity = Vector3.zero;
-			myRigidbody.angularVelocity = Vector3.zero;
+			thisRigidbody.velocity = thisRigidbody.angularVelocity = Vector3.zero;
 
-			if (isRotate) thisTransform.DOLocalRotate(thisTransform.rotation.eulerAngles + Vector3.down * 180 * rotateSpeed, 0.8f, RotateMode.Fast).SetLoops(-1, LoopType.Incremental).SetRelative();
+			if (isRotate) 
+				thisTransform.DOLocalRotate(thisTransform.rotation.eulerAngles + 180 * rotateSpeed * Vector3.down, 0.8f, RotateMode.Fast)
+						.SetLoops(-1, LoopType.Incremental)
+						.SetRelative();
 
-			if (!isTrajectory)
-			{
-				myRigidbody.velocity = transform.forward * speed;
-			}
-			else
-			{
-				m_StartPosition = thisTransform.position;
-				m_TargetPos = thisTransform.forward * 50f;
+			if (!isTrajectory) thisRigidbody.velocity = transform.forward * speed;
 
-			}
 			Done(lifetime);
 		}
 
 		private void OnTriggerEnter(Collider other)
 		{
-			if (other.CompareTag(m_Tag_Player) || other.CompareTag(m_Tag_Ground))
+			if (other.CompareTag(Strings.Tag_Player) || other.CompareTag(Strings.Tag_Ground))
 			{
 				thisCollider.enabled = false;
-				if (other.CompareTag(m_Tag_Player)) PlayerController.Instance.OnDamageTrigger(thisTransform.gameObject, damageAmount);
+				//if (other.CompareTag(Strings.Tag_Player)) 
+				//	PlayerController.Instance.OnDamageTrigger(thisTransform.gameObject, damageAmount);
 
 				Done();
 			}

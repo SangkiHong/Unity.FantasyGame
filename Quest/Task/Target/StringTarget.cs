@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Sangki.Quest
+namespace SK.Quest
 {
     [CreateAssetMenu(menuName = "Quest/Task/Target/String", fileName = "Target_")]
     public class StringTarget : TaskTarget

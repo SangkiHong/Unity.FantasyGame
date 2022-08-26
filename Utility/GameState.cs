@@ -1,4 +1,4 @@
-namespace Sangki.Manager
+namespace SK.Manager
 {
     public enum GameState
     {

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sangki.Scripts
+namespace SK.Scripts
 {
     public class SetRootMotion : StateMachineBehaviour
     {

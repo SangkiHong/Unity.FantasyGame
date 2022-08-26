@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace Sangki.Quest
+namespace SK.Quest
 {
     [CreateAssetMenu(menuName = "Quest/Task/Action/NegativeCount", fileName = "Negative Count")]
     public class NegativeCount : TaskAction

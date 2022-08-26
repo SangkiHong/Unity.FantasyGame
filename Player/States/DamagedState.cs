@@ -1,15 +1,23 @@
-﻿using Sangki.Player;
+﻿using SK.Player;
 using UnityEngine;
 
-namespace Sangki.States
+namespace SK.States
 {
     public class DamagedState : State
     {
+        private readonly Player.PlayerController _player;
+        private readonly StateMachine _stateMachine;
+
+        private CharacterController _characterController;
+
         private float blinkTimer;
         private bool isDamaged;
 
-        public DamagedState(PlayerController player, StateMachine stateMachine) : base(player, stateMachine)
+        public DamagedState(Player.PlayerController player, StateMachine stateMachine)
         {
+            _player = player;
+            _stateMachine = stateMachine;
+            _characterController = _player.characterController;
         }
 
         public override void Enter()
@@ -17,26 +25,26 @@ namespace Sangki.States
             base.Enter();
             blinkTimer = 0;
             isDamaged = true;
-            player.isOnControl = true;
+            Manager.InputManager.Instance.SetControlState(true);
 
             // Knockback
-            player.thisRigidbody.AddRelativeForce(Vector3.forward * -5, ForceMode.Impulse); 
+            _characterController.SimpleMove(Vector3.forward * -5); 
         }
 
-        public override void PhysicsUpdate()
+        public override void FixedTick()
         {
-            base.PhysicsUpdate();
+            base.FixedTick();
 
             // Damage Blink
             if (isDamaged)
             {
-                blinkTimer += player.fixedDeltaTime;
+                blinkTimer += _player.fixedDeltaTime;
 
-                if (blinkTimer >= player.BlinkTime)
+                if (blinkTimer >= _player.BlinkTime)
                 {
                     isDamaged = false;
                     blinkTimer = 0;
-                    stateMachine.ChangeState(player.STATE_Standing);
+                    _stateMachine.ChangeState(_stateMachine.STATE_Locomotion);
                 }
             }
         }
@@ -44,7 +52,7 @@ namespace Sangki.States
         public override void Exit()
         {
             base.Exit();
-            player.isOnControl = true;
+            Manager.InputManager.Instance.SetControlState(true);
         }
     }
 }

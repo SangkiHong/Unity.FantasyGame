@@ -1,19 +1,21 @@
-﻿using Sangki.Player;
+﻿using SK.Player;
 using UnityEngine;
 
-namespace Sangki.States
+namespace SK.States
 {
     public class AttackState : State
     {
-        private readonly int m_Anim_Para_isAttack = Animator.StringToHash("isAttack");
-        private readonly int m_Anim_Para_SwordAttack = Animator.StringToHash("SwordAttack");
-        private readonly int m_Anim_Para_ChargingEnd = Animator.StringToHash("ChargingEnd");
+        private readonly Player.PlayerController _player;
+        private readonly StateMachine _stateMachine;
 
-        private float intervalTimer;
-        private bool isAttack;
+        private float intervalTimer, _chargeTime, chargeTimer;
+        private bool isAttack, isCharged, isChargingStart, isCharging;
 
-        public AttackState(PlayerController player, StateMachine stateMachine) : base(player, stateMachine)
+        public AttackState(Player.PlayerController player, StateMachine stateMachine)
         {
+            _player = player;
+            _stateMachine = stateMachine;
+            _chargeTime = _player.playerData.chargeTime;
         }
 
         public override void Enter()
@@ -26,27 +28,53 @@ namespace Sangki.States
                 intervalTimer = 0;
 
                 // Normal Attack
-                if (!player.isCharged) NormalAttack();
+                if (!isCharged) NormalAttack();
                 // 360 degree Attack
                 else
                 {
-                    player.isCharged = false;
-                    player.anim.SetTrigger(m_Anim_Para_ChargingEnd);
-                    player.particle_RoundSlash.Play();
+                    isCharged = false;
+                    _player.anim.SetTrigger(Strings.AnimPara_ChargingEnd);
+                    //player.particle_RoundSlash.Play();
                 }
             }
         }
 
-        public override void PhysicsUpdate()
+        public override void FixedTick()
         {
-            base.PhysicsUpdate();
-            if (isAttack && !player.anim.GetBool(m_Anim_Para_isAttack))
+            base.FixedTick();
+
+            float fixedDeltaTime = _player.fixedDeltaTime;
+
+            if (isAttack && !_player.anim.GetBool(Strings.AnimPara_OnAttack))
             {
                 if (intervalTimer < 0.5f)
-                    intervalTimer += player.fixedDeltaTime;
+                    intervalTimer += _player.fixedDeltaTime;
                 else
                 {
-                    stateMachine.ChangeState(player.STATE_Standing);
+                    _stateMachine.ChangeState(_stateMachine.STATE_Locomotion);
+                }
+            }
+            
+            // Charging Attack Timer
+            if (isCharging && !isCharged)
+            {
+                if (_chargeTime > chargeTimer)
+                {
+                    chargeTimer += fixedDeltaTime;
+
+                    if (chargeTimer > 0.3f && !isChargingStart)
+                    {
+                        isChargingStart = true;
+                        //particle_Charging.Play();
+                    }
+                }
+                else
+                {
+                    isCharged = true;
+                    isChargingStart = false;
+                    // TODO SK - 공격 모션 애니메이션 호출(Crossfade)
+                    //anim.SetTrigger(Strings.AnimPara_ChargingAttack);
+                    //particle_ChargeComplete.Play();
                 }
             }
         }
@@ -60,8 +88,9 @@ namespace Sangki.States
         private void NormalAttack()
         {
             intervalTimer = 0;
-            player.anim.SetTrigger(m_Anim_Para_SwordAttack);
-            if (player.particle_Charging.isPlaying) player.particle_Charging.Stop();
+            // TODO SK - 공격 모션 애니메이션 호출(Crossfade)
+            //_player.anim.SetTrigger(m_Anim_Para_SwordAttack);
+            //if (player.particle_Charging.isPlaying) player.particle_Charging.Stop();
         }
     }
 }

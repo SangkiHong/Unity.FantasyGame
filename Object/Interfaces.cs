@@ -1,5 +1,5 @@
 
-namespace Sangki
+namespace SK
 {
     public interface IInteractable
     {

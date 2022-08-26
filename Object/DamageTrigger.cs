@@ -1,33 +1,28 @@
 using UnityEngine;
-using Sangki.Player;
+using SK.Player;
 
-namespace Sangki.Object
+namespace SK.Object
 {
     public class DamageTrigger : MonoBehaviour
     {
         public int damageAmount = 1;
 
-        GameObject thisGameobejct;
-        Collider thisCollider;
-        readonly string m_tag_Player = "Player";
+        private Collider thisCollider;
 
         private void Awake()
         {
-            if (!thisGameobejct) thisGameobejct = gameObject;
             if (!thisCollider) thisCollider = this.GetComponent<Collider>();
         }
 
         private void OnEnable()
-        {
-            thisCollider.enabled = true;
-        }
+            => thisCollider.enabled = true;
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other.CompareTag(m_tag_Player))
+            if (other.CompareTag(Strings.Tag_Player))
             {
                 thisCollider.enabled = false;
-                PlayerController.Instance.OnDamageTrigger(thisGameobejct, damageAmount);
+                //PlayerController.Instance.OnDamageTrigger(gameObject, damageAmount);
             }
         }
     }

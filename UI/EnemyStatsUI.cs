@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 
-namespace Sangki
+namespace SK
 {
     public class EnemyStatsUI : PoolObject
     {

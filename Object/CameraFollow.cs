@@ -1,7 +1,7 @@
 using UnityEngine;
-using Sangki.Player;
+using SK.Player;
 
-namespace Sangki.Object
+namespace SK.Object
 {
     public class CameraFollow : MonoBehaviour
     {
@@ -25,7 +25,7 @@ namespace Sangki.Object
 
         private void LateUpdate()
         {
-            if (!PlayerController.Instance.isDead)
+            if (!Player.PlayerController.Instance.IsDead)
             {
                 thisTransform.SetPositionAndRotation
                     (Vector3.Lerp(thisTransform.position, targetObject.transform.position + offset, smoothFactor),

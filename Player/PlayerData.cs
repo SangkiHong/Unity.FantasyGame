@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sangki
+namespace SK
 {
 
     [CreateAssetMenu(fileName = "PlayerData", menuName = "Game Data/Player Data")]
@@ -18,7 +18,9 @@ namespace Sangki
 
         public float speedOnTargeting = 0.5f;
 
-        public float jumpForce = 16;
+        public float jumpTime = 1.2f;
+
+        public float jumpForce = 3f;
 
         public float jumpIntervalDelay = 0.6f;
 

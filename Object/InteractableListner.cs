@@ -4,9 +4,9 @@ using UnityEngine.Events;
 using Sirenix.OdinInspector;
 using DG.Tweening;
 using MoreMountains.Feedbacks;
-using Sangki.Enemy;
+using SK.FSM;
 
-namespace Sangki.Object
+namespace SK.Object
 {
     public class InteractableListner : MonoBehaviour, IInteractable
     {

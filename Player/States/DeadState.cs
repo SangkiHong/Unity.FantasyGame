@@ -1,21 +1,26 @@
-﻿using Sangki.Player;
+﻿using SK.Player;
 using UnityEngine;
 using EPOOutline;
 
-namespace Sangki.States
+namespace SK.States
 {
     public class DeadState : State
     {
-        private readonly int m_Anim_Para_Dead = Animator.StringToHash("Dead");
-        public DeadState(PlayerController player, StateMachine stateMachine) : base(player, stateMachine)
+        private readonly Player.PlayerController _player;
+        private readonly StateMachine _stateMachine;
+
+
+        public DeadState(Player.PlayerController player, StateMachine stateMachine)
         {
+            _player = player;
+            _stateMachine = stateMachine;
         }
 
         public override void Enter()
         {
             base.Enter();
-            player.anim.SetTrigger(m_Anim_Para_Dead);
-            Outlinable[] outlinables = player.GetComponentsInChildren<Outlinable>();
+            _player.anim.SetTrigger(Strings.AnimPara_Dead);
+            Outlinable[] outlinables = _player.GetComponentsInChildren<Outlinable>();
             foreach (var outline in outlinables)
             {
                 outline.enabled = false;

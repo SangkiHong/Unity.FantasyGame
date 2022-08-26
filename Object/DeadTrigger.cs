@@ -1,21 +1,17 @@
 using UnityEngine;
-using Sangki.Enemy;
+using SK.FSM;
 
-namespace Sangki
+namespace SK
 {
     public class DeadTrigger : MonoBehaviour
     {
-        readonly string m_Tag_Player = "Player";
-        readonly string m_Tag_Enemy = "Enemy";
-
         private void OnTriggerEnter(Collider other)
         {
-            if (other.CompareTag(m_Tag_Player))
+            if (other.CompareTag(Strings.Tag_Player))
             {
-                Player.PlayerController.Instance.isDead = true;
                 Player.PlayerController.Instance.Damage(int.MaxValue);
             }
-            if (other.CompareTag(m_Tag_Enemy))
+            if (other.CompareTag(Strings.Tag_Enemy))
             {
                 other.GetComponent<EnemyContoller>().Damage(int.MaxValue);
             }
