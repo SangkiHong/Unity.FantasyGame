@@ -27,7 +27,7 @@ namespace SK.Manager
         
         private Vector2 _movement;
         private bool _isOnControl = true;
-        private bool _isOnRun;
+        private bool _isRunning;
 
         public Vector2 Movement 
         { 
@@ -35,7 +35,7 @@ namespace SK.Manager
             set => _movement = value;
         }
         public bool IsOnControl => _isOnControl;
-        public bool IsOnRun => _isOnRun;
+        public bool IsRunning => _isRunning;
 
         private void Awake()
         {
@@ -53,8 +53,8 @@ namespace SK.Manager
             inputAction_Move.canceled += Move;
 
             InputAction inputAction_Run = playerInput.actions["Run"];
-            inputAction_Run.started += (x) => { _isOnRun = true; };
-            inputAction_Run.canceled += (x) => { _isOnRun = false; };
+            inputAction_Run.started += (x) => { _isRunning = true; };
+            inputAction_Run.canceled += (x) => { _isRunning = false; };
 
             InputAction inputAction_Jump = playerInput.actions["Jump"];
             inputAction_Jump.started += Jump;
@@ -82,8 +82,10 @@ namespace SK.Manager
 
         private void Move(InputAction.CallbackContext context)
         {
-            if (_isOnControl)
+            if (context.performed)
                 _movement = context.ReadValue<Vector2>();
+            else if (context.canceled)
+                _movement = Vector3.zero;
         }
 
         private void Jump(InputAction.CallbackContext context)
@@ -93,9 +95,7 @@ namespace SK.Manager
         }
 
         private void Dodge(InputAction.CallbackContext context)
-        {
-            Input_Button_Dodge?.Invoke();
-        }
+            => Input_Button_Dodge?.Invoke();
 
         private void Attack(InputAction.CallbackContext context)
         {

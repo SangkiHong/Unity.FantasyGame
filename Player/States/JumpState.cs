@@ -96,7 +96,7 @@ namespace SK.States
                     _aim.SetTrigger(Strings.AnimPara_Jump);
 
                     // 점프 시 피드백 실행
-                    _player.feedback_Jump?.PlayFeedbacks();
+                    //_player.feedback_Jump?.PlayFeedbacks();
 
                     // 점프 후 착지 판정 사이의 간격 타이머
                     _player.jumpIntervalTimer = _player.JumpIntervalDelay;

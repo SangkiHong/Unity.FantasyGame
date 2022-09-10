@@ -2,7 +2,6 @@ using UnityEngine;
 
 namespace SK
 {
-
     [CreateAssetMenu(fileName = "PlayerData", menuName = "Game Data/Player Data")]
     public class PlayerData : ScriptableObject
     {
@@ -14,6 +13,8 @@ namespace SK
         
         public float speed = 5;
 
+        public float runSpeed = 10;
+
         public float speedOnShield = 0.2f;
 
         public float speedOnTargeting = 0.5f;
@@ -24,7 +25,7 @@ namespace SK
 
         public float jumpIntervalDelay = 0.6f;
 
-        public float diveRollingForce = 3f;
+        public float dodgeForce = 3f;
 
         public float blinkTime = 1;
 
@@ -33,7 +34,5 @@ namespace SK
         public float chargeTime = 0.7f;
 
         public float parryingTime = 0.3f;
-
-        public float stepSize = 0.3f;
     }
 }

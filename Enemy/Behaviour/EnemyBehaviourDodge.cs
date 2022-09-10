@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using DG.Tweening;
 
@@ -55,7 +54,7 @@ namespace SK.FSM.Behaviour
                                 /*if (_enemyData.canCounterAttack && Random.value < _enemyData.counterattackChance)
                                     CounterAttack(); // 공격 상태로 변경되도록..*/
                             });
-                        _anim.SetTrigger(Strings.AnimPara_Dodge);
+                        //_anim.SetTrigger(Strings.AnimPara_Dodge);
                     }
                 }
             }

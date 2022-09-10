@@ -62,7 +62,7 @@ namespace SK.States
                     {
                         _shieldLayerWeight = 0;
                         _anim.SetLayerWeight(1, 0);
-                        _anim.SetTrigger(Strings.AnimPara_Parrying);
+                        //_anim.SetTrigger(Strings.AnimPara_Parrying);
                         _player.feedback_Parrying?.PlayFeedbacks();
                         // FX
                         //PoolManager.instance.GetObject(m_ObjectPool_SwordImpactGold, shieldParent.position);

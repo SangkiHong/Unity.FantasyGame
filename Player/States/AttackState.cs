@@ -5,92 +5,101 @@ namespace SK.States
 {
     public class AttackState : State
     {
-        private readonly Player.PlayerController _player;
+        private readonly PlayerController _player;
         private readonly StateMachine _stateMachine;
+        private readonly Animator _anim;
 
-        private float intervalTimer, _chargeTime, chargeTimer;
-        private bool isAttack, isCharged, isChargingStart, isCharging;
+        private readonly float _chargingCompleteTime; // 차지 완료 시간
+        private readonly float _chargingStartTime = 0.7f; // 시작되는 시간
+        private readonly float _comboAttackTime = 0.7f; // 연속 공격 가능 시간
+        private float _attackButtonTime, _lastAttackTime;
+        private bool _onAttack, _attackCheck, _isCharging, _isCharged;
 
-        public AttackState(Player.PlayerController player, StateMachine stateMachine)
+        private readonly int _attackCount;
+        private int _attackIndex;
+
+        public AttackState(PlayerController player, StateMachine stateMachine)
         {
             _player = player;
             _stateMachine = stateMachine;
-            _chargeTime = _player.playerData.chargeTime;
+            _anim = _player.anim;
+            _chargingCompleteTime = _player.playerData.chargeTime;
+            _attackCount = _player.attacks.Length;
         }
 
         public override void Enter()
         {
             base.Enter();
 
-            if (!isAttack)
-            {
-                isAttack = true;
-                intervalTimer = 0;
+            // 콤보 가능 시간 보다 지체된 경우 공격 인덱스 초기화
+            if (_lastAttackTime + _comboAttackTime < Time.time)
+                _attackIndex = 0;
 
-                // Normal Attack
-                if (!isCharged) NormalAttack();
-                // 360 degree Attack
-                else
-                {
-                    isCharged = false;
-                    _player.anim.SetTrigger(Strings.AnimPara_ChargingEnd);
-                    //player.particle_RoundSlash.Play();
-                }
-            }
+            _isCharging = _isCharged = false;
+            _onAttack = _attackCheck = false;
+            _player.anim.ResetTrigger(Strings.AnimPara_ChargingEnd);
+            _attackButtonTime = Time.time;
         }
 
         public override void FixedTick()
         {
             base.FixedTick();
 
-            float fixedDeltaTime = _player.fixedDeltaTime;
-
-            if (isAttack && !_player.anim.GetBool(Strings.AnimPara_OnAttack))
+            // 차징 시작
+            if (!_isCharging && _attackButtonTime + _chargingStartTime > Time.time)
             {
-                if (intervalTimer < 0.5f)
-                    intervalTimer += _player.fixedDeltaTime;
-                else
-                {
-                    _stateMachine.ChangeState(_stateMachine.STATE_Locomotion);
-                }
+                _isCharging = true;
             }
-            
-            // Charging Attack Timer
-            if (isCharging && !isCharged)
-            {
-                if (_chargeTime > chargeTimer)
-                {
-                    chargeTimer += fixedDeltaTime;
 
-                    if (chargeTimer > 0.3f && !isChargingStart)
-                    {
-                        isChargingStart = true;
-                        //particle_Charging.Play();
-                    }
-                }
-                else
-                {
-                    isCharged = true;
-                    isChargingStart = false;
-                    // TODO SK - 공격 모션 애니메이션 호출(Crossfade)
-                    //anim.SetTrigger(Strings.AnimPara_ChargingAttack);
-                    //particle_ChargeComplete.Play();
-                }
+            // 차징 공격 준비 완료
+            if (_isCharging && !_isCharged && _attackButtonTime + _chargingCompleteTime > Time.time)
+            {
+                _isCharged = true;
             }
+
+            // 공격 중인 경우
+            if (_onAttack && !_attackCheck && _anim.GetBool(Strings.AnimPara_OnAttack))
+            {
+                _attackCheck = true;
+                return;
+            }
+
+            if (_attackCheck && !_anim.GetBool(Strings.AnimPara_OnAttack))
+                _stateMachine.ChangeState(_stateMachine.STATE_Locomotion);
         }
 
         public override void Exit()
         {
             base.Exit();
-            isAttack = false;
+            _isCharging = _isCharged = false;
+            _onAttack = _attackCheck = false;
+            _lastAttackTime = Time.time;
+        }
+
+        public void Attack()
+        {
+            Debug.Log($"ATTACK");
+            _onAttack = true;
+            // Normal Attack
+            if (!_isCharged) NormalAttack();
+            // Charging Attack
+            else ChargingAttack();
         }
 
         private void NormalAttack()
         {
-            intervalTimer = 0;
-            // TODO SK - 공격 모션 애니메이션 호출(Crossfade)
-            //_player.anim.SetTrigger(m_Anim_Para_SwordAttack);
+            Debug.Log($"ATTACK NORMAL");
+            _attackIndex %= _attackCount;
+            _player.combat.BeginAttack(_player.attacks[_attackIndex++]);
+            //particle_ChargeComplete.Play();
             //if (player.particle_Charging.isPlaying) player.particle_Charging.Stop();
+        }
+
+        private void ChargingAttack()
+        {
+            Debug.Log($"ATTACK CHARGING");
+            _player.anim.SetTrigger(Strings.AnimPara_ChargingEnd);
+            //player.particle_RoundSlash.Play();
         }
     }
 }

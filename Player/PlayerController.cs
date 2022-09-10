@@ -9,6 +9,7 @@ using SK.FSM;
 using SK.Manager;
 using SK.States;
 using SK.Utility;
+using SK.Combat;
 
 namespace SK.Player
 {
@@ -39,17 +40,23 @@ namespace SK.Player
         [SerializeField] internal TargetingSystem targetingSystem;
         [FoldoutGroup("COMPONENTS")]
         [SerializeField] private Transform shieldParent;
+        [FoldoutGroup("COMPONENTS")]
+        [SerializeField] internal Combat.Combat combat;
         #endregion
 
         #region INFO
         [Header("INFO")]
+        [FoldoutGroup("INFO")]
         [SerializeField] internal string CurrentState;
+        [FoldoutGroup("INFO")]
         [SerializeField] internal Vector3 movemnt;
         #endregion
 
         #region PLAYER STATES
         [Header("PLAYER STATES")]
+        [FoldoutGroup("PLAYER STATES")]
         [SerializeField] internal bool canDamage;
+        [FoldoutGroup("PLAYER STATES")]
         [SerializeField] private bool _isDead, _isOnGround, _isFalling;
         #endregion
 
@@ -59,6 +66,8 @@ namespace SK.Player
         [SerializeField] internal PlayerData playerData;
         [FoldoutGroup("STATS")]
         [SerializeField] private int currentHealth;
+        [FoldoutGroup("STATS")]
+        [SerializeField] internal AttackData[] attacks;
         #endregion
 
         #region FEEDBACKS
@@ -93,7 +102,7 @@ namespace SK.Player
         public float JumpTime => playerData.jumpTime;
         public float JumpForce => playerData.jumpForce;
         public float JumpIntervalDelay => playerData.jumpIntervalDelay;
-        public float DiveRollingForce => playerData.diveRollingForce;
+        public float DodgeForce => playerData.dodgeForce;
         public float BlinkTime => playerData.blinkTime;
         public float ParryingTime => playerData.parryingTime;
         #endregion
@@ -163,24 +172,11 @@ namespace SK.Player
             // 버튼을 눌렀을 경우
             if (inputState == InputState.onStart)
             {
-                if (!IsOnGround || stateMachine.CurrentState != stateMachine.STATE_Locomotion)
+                if (!IsOnGround || stateMachine.CurrentState != stateMachine.STATE_Locomotion ||
+                    stateMachine.STATE_Locomotion.IsDodge)
                     return;
 
-                // 타겟팅 중이 아닌 경우 일반 점프
-                if (!targetingSystem.IsOnTargeting)
-                    stateMachine.ChangeState(stateMachine.STATE_Jump);
-                else
-                { // 타겟팅 중인 경우 닷지 작동{
-                  // Initialize
-                    InputManager.Instance.SetControlState(false);
-
-                    // 애니메이션
-                    //anim.SetTrigger(Strings.AnimPara_Dodge);
-
-                    // 닷지 방향(캐릭터 전방)
-                    if (targetingSystem.IsOnTargeting)
-                        stateMachine.STATE_Locomotion.ExecuteDodge(thisTransform.forward);
-                }
+                stateMachine.ChangeState(stateMachine.STATE_Jump);
             }
             // 버튼을 뗐을 경우
             else if (inputState == InputState.onEnd)
@@ -196,6 +192,17 @@ namespace SK.Player
                 stateMachine.CurrentState == stateMachine.STATE_Jump)
                 return;
 
+            if (inputState == InputState.onStart)
+            {
+                Debug.Log($"ATTACK START");
+                stateMachine.ChangeState(stateMachine.STATE_Attack);
+            }
+            else if (inputState == InputState.onEnd)
+            {
+                Debug.Log($"ATTACK END");
+                stateMachine.STATE_Attack.Attack();
+            }
+
             OnPlayerAttack?.Invoke();
         }
 
@@ -204,13 +211,23 @@ namespace SK.Player
             if (!IsOnGround || stateMachine.CurrentState != stateMachine.STATE_Locomotion)
                 return;
 
+            stateMachine.STATE_Locomotion.ExecuteDodge();
         }
 
         public void Button_Shield(InputState inputState)
         {
             if (IsOnGround)
             {
-                
+                // 쉴드
+                if (inputState == InputState.onStart)
+                {
+                    Debug.Log("SHIELD ON");
+                }
+                // 쉴드 해제
+                else
+                {
+                    Debug.Log("SHIELD OFF");
+                }
             }
         }
 
@@ -291,16 +308,14 @@ namespace SK.Player
 
         private void ResetAllTriggers()
         {
-            anim.ResetTrigger(Strings.AnimPara_Attack);
-            anim.ResetTrigger(Strings.AnimPara_Parrying);
             anim.ResetTrigger(Strings.AnimPara_Falling);
-            anim.ResetTrigger(Strings.AnimPara_Dodge);
             anim.ResetTrigger(Strings.AnimPara_Land);
         }
         #endregion
 
-        #region 애니메이션
+        #region 애니메이션 이벤트
         public void FootSound() => MasterAudio.PlaySound(Strings.Sound_FootSound);
+        public void OnDodgeEnd() => stateMachine.STATE_Locomotion.OnDodgeEnd();
         #endregion
 
         #region UTILITY
@@ -340,22 +355,25 @@ namespace SK.Player
         private void CheckGrounded()
         {
             // CharacterController.IsGrounded가 true라면 Raycast를 사용하지 않고 판정 종료
-            if (characterController.isGrounded) _isOnGround = true;
+            if (characterController.isGrounded) 
+            {
+                _isOnGround = true;
+                return;
+            }
 
             // 발사하는 광선의 초기 위치와 방향
             // 약간 신체에 박혀 있는 위치로부터 발사하지 않으면 제대로 판정할 수 없을 때가 있다.
             var maxDistance = 0.2f;
 
-            var ray1 = new Ray(thisTransform.position - (thisTransform.forward * 0.3f), Vector3.down * maxDistance);
+            var ray_Center = new Ray(thisTransform.position + (Vector3.up * 0.1f), Vector3.down * (maxDistance + 0.1f));
+            Debug.DrawRay(thisTransform.position + (Vector3.up * 0.1f), Vector3.down * (maxDistance + 0.1f), Color.red);
 
-            Debug.DrawRay(thisTransform.position - (thisTransform.forward * 0.3f), Vector3.down * maxDistance, Color.green);
-
-            _isOnGround = Physics.Raycast(ray1, maxDistance, _fieldLayer);
+            if (_isOnGround = Physics.Raycast(ray_Center, maxDistance, _fieldLayer)) 
+                return;
 
             if (!_isOnGround && stateMachine.CurrentState == stateMachine.STATE_Locomotion)
             {
-                Vector3 slipDirection = thisTransform.forward + (Vector3.down * 10);
-                characterController.Move(slipDirection * fixedDeltaTime);
+                characterController.Move(Vector3.down * 10);
             }
         }
 
